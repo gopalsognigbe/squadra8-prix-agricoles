@@ -232,6 +232,11 @@ __marimo__/
 # Données brutes téléchargées (FAO, etc.) : on garde seulement le dossier
 data/raw/*
 !data/raw/.gitkeep
+data/**/prix_fao*.csv
+data/**/prix_fao*.xlsx
+data/*.csv
+data/*.xlsx
+!data/seeds/*.csv
 
 # Clips audio générés par Piper (ils se régénèrent avec voix/generer_clips.py)
 voix/clips/*.wav

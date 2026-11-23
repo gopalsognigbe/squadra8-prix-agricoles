@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     twilio_auth_token: str = ""
     twilio_phone_number: str = ""
 
+    # Mise à jour FAO (API FPMA) au démarrage, en tâche de fond.
+    maj_fao_au_demarrage: bool = True
+    maj_fao_tout_benin: bool = False
+
     @model_validator(mode="after")
     def _groq_defaults(self) -> "Settings":
         # Clé Groq (gsk_…) sans base URL explicite → endpoint Groq.
