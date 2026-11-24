@@ -11,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
-from app.services.calculs import vers_100kg
+from app.services.calculs import arrondir_f, vers_100kg
 from app.services.source_prix import (
     SourceFaoCsv,
     get_source_prix,
@@ -64,11 +64,26 @@ def test_prix_du_jour_mais_blanc_trois_marches() -> None:
     assert bohicon["prix_kg"] == pytest.approx(137.36)
     assert bohicon["prix_fcfa"] == pytest.approx(137.36)
     assert bohicon["prix_100kg"] == 13736
+    assert bohicon["prix_kg_annonce"] == 137
+    assert bohicon["prix_kg_annonce"] != arrondir_f(137.36)
+    assert arrondir_f(137.36) == 135
     assert bohicon["date_releve"] == "2026-10-25"
     assert bohicon["source"] == "SIM-Bénin - CT-SAGSA"
     assert bohicon["unite"] == "Kilogramme"
     assert bohicon["type_prix"] == "detail"
     assert bohicon["devise"] == "XOF"
+
+
+def test_annonce_fao_arrondi_au_franc_pas_cinq() -> None:
+    """Annonce FAO : franc près ; 100 kg = vers_100kg sur le prix exact."""
+    source = SourceFaoCsv(CSV_EXEMPLE)
+    bohicon = source.prix_du_jour("Maïs Blanc")[0]
+    assert bohicon["prix_kg"] == pytest.approx(137.36)
+    assert bohicon["prix_kg_annonce"] == 137
+    assert bohicon["prix_100kg"] == vers_100kg(137.36) == 13736
+    assert arrondir_f(137.36) == 135
+    # 253 F : l'arrondi aux 5 F donnerait 255.
+    assert arrondir_f(253.0) == 255
 
 
 def test_alias_mais_identique() -> None:
