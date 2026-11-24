@@ -85,6 +85,7 @@ def test_sans_cle_groq_pas_appele(monkeypatch):
 
 def test_audio_trop_long_sans_repli(monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "gsk_x")
+    monkeypatch.setenv("AUDIO_MAX_S", "8")
     get_settings.cache_clear()
     monkeypatch.setattr(t, "_groq", lambda c, *a: ("bla", 9.0))
     monkeypatch.setattr(t, "_local", _interdit)
