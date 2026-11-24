@@ -249,3 +249,6 @@ models/whisper/
 models
 #clips de voix
 voix/clips
+
+# Audios et résultats du test touche 3 (G8) — ne jamais committer
+data/test_touche3/
