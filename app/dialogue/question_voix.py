@@ -9,6 +9,10 @@ et, pour une offre, le montant dit par l'appelant.
 
 Clés renvoyées :
     erreur    : None | "trop_long" | "vide" | "transcription" | "ia"
+
+Chaque précision vient de l'IA ET d'une règle de secours lue dans la phrase.
+Si les deux se contredisent (couleur, marché, montant, unité), la valeur est
+None : le moteur demande à l'appelant au lieu de deviner.
     texte     : transcription
     intention : "prix" | "juger_offre" | "autre" | "inconnu"
     famille   : "mais" | "soja" | "haricot" | None
@@ -23,19 +27,20 @@ from __future__ import annotations
 import logging
 
 from app.ia.intention import comprendre
-from app.ia.regles import PRODUITS, extraire_offre, trouver_variete
+from app.ia.regles import (
+    PRODUITS,
+    VARIETES,
+    extraire_offre,
+    groupes_nombres,
+    resoudre_ville_marche,
+    trouver_produit,
+    trouver_variete,
+)
 from app.ia.transcription import AudioTropLong, transcrire
 
 logger = logging.getLogger(__name__)
 
 PREFIXE_TEXTE = "texte:"
-
-# Code IA → nom FAO exact (3 marchés MVP seulement, pas d'autre marché).
-MARCHE_FAO = {
-    "bohicon": "Bohicon",
-    "abomey": "Houndjro (Abomey)",
-    "cove": "Azogotchébou (Covè)",
-}
 
 
 def _resultat(erreur: str | None, texte: str = "", **autres) -> dict:
@@ -77,18 +82,43 @@ def analyser_question(valeur: str) -> dict:
         logger.warning("Intention impossible : %s", exc)
         return _resultat("ia", texte)
 
-    famille = compris.get("produit")
-    if famille not in PRODUITS:
-        famille = None
-    marche = MARCHE_FAO.get(compris.get("marche") or "")
-    offre = extraire_offre(texte)
+    return _fusionner(texte, compris)
+
+
+def _accord(ia, regle):
+    """IA et règle d'accord, ou une seule des deux. En désaccord → None (on demande)."""
+    if ia is not None and regle is not None and ia != regle:
+        return None
+    return ia if ia is not None else regle
+
+
+def _fusionner(texte: str, compris: dict) -> dict:
+    """Croise la réponse de l'IA avec la règle de secours lue dans la phrase."""
+    # Produit : l'IA d'abord (« mais » est aussi un mot courant), la règle en secours.
+    ia_famille = compris.get("produit") if compris.get("produit") in PRODUITS else None
+    famille = ia_famille or trouver_produit(texte)
+
+    ia_variete = compris.get("variete")
+    if ia_variete not in VARIETES.get(famille or "", {}):
+        ia_variete = None
+    variete = _accord(ia_variete, trouver_variete(texte, famille))
+
+    marche = _accord(resoudre_ville_marche(compris.get("marche")), resoudre_ville_marche(texte))
+
+    regle = extraire_offre(texte)
+    ia_montant = compris.get("montant_offre")
+    if not isinstance(ia_montant, int) or ia_montant <= 0 or not groupes_nombres(texte):
+        ia_montant = None  # aucun nombre dans la phrase : montant de l'IA refusé
+    montant = _accord(ia_montant, regle["montant"])
+    unite = _accord(compris.get("unite_offre"), regle["unite"])
+
     return _resultat(
         None,
         texte,
         intention=compris.get("intention") or "inconnu",
         famille=famille,
-        variete=trouver_variete(texte, famille),
+        variete=variete,
         marche=marche,
-        montant=offre["montant"],
-        unite=offre["unite"],
+        montant=montant,
+        unite=unite,
     )

@@ -291,3 +291,159 @@ def test_analyser_produit_inconnu_et_ia_en_panne(monkeypatch) -> None:
 
     monkeypatch.setattr(QV, "comprendre", casse)
     assert QV.analyser_question("texte:bonjour")["erreur"] == "ia"
+
+
+# ---------- précisions de Gopal : ville ↔ marché, couleur, montant en lettres ----------
+from app.ia.intention import IntentionResult  # noqa: E402
+from app.ia.regles import (  # noqa: E402
+    VILLE_DU_MARCHE,
+    comprendre_par_regles,
+    montant_en_francs,
+    resoudre_ville_marche,
+)
+
+
+@pytest.mark.parametrize("dit, fao", [
+    ("Abomey", "Houndjro (Abomey)"), ("abomé", "Houndjro (Abomey)"),
+    ("Houndjro", "Houndjro (Abomey)"), ("houndjoro", "Houndjro (Abomey)"),
+    ("abomey", "Houndjro (Abomey)"), ("Houndjro (Abomey)", "Houndjro (Abomey)"),
+    ("Covè", "Azogotchébou (Covè)"), ("cove", "Azogotchébou (Covè)"),
+    ("kove", "Azogotchébou (Covè)"), ("A Covet, un acheteur", "Azogotchébou (Covè)"),
+    ("Azogotchébou", "Azogotchébou (Covè)"), ("azogotchebou", "Azogotchébou (Covè)"),
+    ("azogotcheboux", "Azogotchébou (Covè)"),
+    ("Bohicon", "Bohicon"), ("bohikon", "Bohicon"),
+])
+def test_ville_vers_marche_fao(dit, fao) -> None:
+    assert resoudre_ville_marche(dit) == fao
+
+
+@pytest.mark.parametrize("dit", ["Parakou", "Cotonou", "", None, "Abomey ou Bohicon"])
+def test_ville_inconnue_ou_ambigue(dit) -> None:
+    assert resoudre_ville_marche(dit) is None
+
+
+def test_marche_vers_ville_dans_les_deux_sens() -> None:
+    for fao, ville in VILLE_DU_MARCHE.items():
+        assert resoudre_ville_marche(ville) == fao
+        assert resoudre_ville_marche(fao) == fao
+        assert ville in fao  # l'annonce dit « Houndjro (Abomey) »
+
+
+@pytest.mark.parametrize("phrase, montant", [
+    ("quinze mille francs", 15000),
+    ("15 000 francs", 15000),
+    ("15000 F", 15000),
+    ("15 mille francs", 15000),
+    ("vingt-cinq mille cinq cents francs", 25500),
+    ("onze mille francs le sac", 11000),
+    ("cent vingt-cinq francs le kilo", 125),
+    ("trois cent quatre-vingts francs", 380),
+    ("quatre-vingt-dix mille francs", 90000),
+    ("soixante-dix mille francs", 70000),
+    ("vingt et un mille francs", 21000),
+    ("un acheteur me propose douze mille", 12000),  # « un » n'est pas un montant
+    ("le sac de 100 kilos à 15 000", 15000),  # le poids n'est pas un montant
+    ("le prix du maïs", None),
+    ("douze mille ou treize mille", None),  # deux montants : on demande
+])
+def test_montant_en_lettres_ou_chiffres(phrase, montant) -> None:
+    assert montant_en_francs(phrase) == montant
+
+
+@pytest.mark.parametrize("phrase, attendu", [
+    ("quinze mille francs le sac", {"montant": 15000, "unite": "sac"}),
+    ("douze mille francs le sac de cent kilos", {"montant": 12000, "unite": "100kg"}),
+    ("douze mille le sac de 50 kilos", {"montant": 12000, "unite": "sac"}),
+])
+def test_extraire_offre_en_lettres(phrase, attendu) -> None:
+    assert extraire_offre(phrase) == attendu
+
+
+@pytest.mark.parametrize("phrase, famille, variete", [
+    ("haricot noir", "haricot", "noir"),
+    ("haricots blancs", "haricot", "blanc"),
+    ("maïs blanc", "mais", "blanc"),
+    ("le haricot", "haricot", None),
+])
+def test_couleurs(phrase, famille, variete) -> None:
+    assert trouver_variete(phrase, famille) == variete
+
+
+def test_regles_de_secours_completes() -> None:
+    r = comprendre_par_regles(
+        "à Houndjoro on me propose vingt-cinq mille cinq cents francs le sac de haricot rouge")
+    assert r["intention"] == "juger_offre" and r["produit"] == "haricot"
+    assert r["marche"] == "abomey" and r["variete"] == "rouge"
+    assert r["montant_offre"] == 25500 and r["unite_offre"] == "sac"
+    p = comprendre_par_regles("le prix du maïs jaune à Kove")
+    assert p["marche"] == "cove" and p["variete"] == "jaune" and p["montant_offre"] is None
+
+
+def test_schema_ia_tolerant() -> None:
+    r = IntentionResult.model_validate({
+        "intention": "juger_offre", "produit": "mais", "marche": "abomey",
+        "variete": "Jaune", "montant_offre": "15 000", "unite_offre": "SAC"})
+    assert (r.variete, r.montant_offre, r.unite_offre) == ("jaune", 15000, "sac")
+    r = IntentionResult.model_validate({
+        "intention": "prix", "variete": "vert", "montant_offre": "beaucoup", "unite_offre": "tonne"})
+    assert (r.variete, r.montant_offre, r.unite_offre) == (None, None, None)
+
+
+def _ia(monkeypatch, **reponse) -> None:
+    base = {"intention": "juger_offre", "produit": "mais", "marche": None, "confiance": 0.9,
+            "variete": None, "montant_offre": None, "unite_offre": None}
+    base.update(reponse)
+    monkeypatch.setattr(QV, "comprendre", lambda t: base)
+
+
+def test_ia_et_regle_d_accord(monkeypatch) -> None:
+    _ia(monkeypatch, marche="Abomey", variete="jaune", montant_offre=15000, unite_offre="sac")
+    r = QV.analyser_question("texte:à Abomé on me propose quinze mille francs le sac de maïs jaune")
+    assert r["marche"] == "Houndjro (Abomey)" and r["variete"] == "jaune"
+    assert r["montant"] == 15000 and r["unite"] == "sac"
+
+
+def test_code_ia_cove_et_montant_en_chiffres(monkeypatch) -> None:
+    _ia(monkeypatch, montant_offre=15000, unite_offre="sac", marche="cove")
+    r = QV.analyser_question("texte:on me propose 15 000 balles pour le sac de maïs blanc")
+    assert r["montant"] == 15000 and r["marche"] == "Azogotchébou (Covè)"
+
+
+def test_montant_ia_sans_nombre_dans_la_phrase_refuse(monkeypatch) -> None:
+    _ia(monkeypatch, montant_offre=15000)
+    r = QV.analyser_question("texte:un acheteur veut mon maïs blanc, c'est bon ?")
+    assert r["montant"] is None
+
+
+def test_desaccord_ia_regle_on_ne_devine_pas(monkeypatch) -> None:
+    _ia(monkeypatch, montant_offre=50000, variete="blanc", marche="bohicon")
+    r = QV.analyser_question("texte:à Covè on me propose quinze mille le sac de maïs jaune")
+    assert r["montant"] is None and r["variete"] is None and r["marche"] is None
+
+
+def test_regle_seule_quand_ia_tombe(monkeypatch) -> None:
+    monkeypatch.setattr(QV, "comprendre", comprendre_par_regles)
+    r = QV.analyser_question(
+        "texte:à Kove on m'offre vingt-cinq mille cinq cents francs le sac de haricot noir")
+    assert r["intention"] == "juger_offre" and r["famille"] == "haricot"
+    assert r["variete"] == "noir" and r["marche"] == "Azogotchébou (Covè)"
+    assert r["montant"] == 25500 and r["unite"] == "sac"
+
+
+def test_parcours_complet_abome_quinze_mille_le_sac(monkeypatch) -> None:
+    monkeypatch.setattr(QV, "comprendre", comprendre_par_regles)
+    jouer, _, _ = appel_voix(QV.analyser_question)
+    tour = jouer("VOIX", "texte:à Abomé on me propose quinze mille francs le sac de maïs jaune")
+    assert tour.etat == "CONFIRMER_SAC" and "quinze mille francs le sac" in texte(tour)
+    t = texte(jouer("TOUCHE", "1"))
+    assert "cent cinquante francs le kilo" in t and "Houndjro (Abomey)" in t
+    verifier_regles_annonce(t)
+
+
+def test_parcours_complet_couleur_absente_on_demande(monkeypatch) -> None:
+    monkeypatch.setattr(QV, "comprendre", comprendre_par_regles)
+    jouer, _, _ = appel_voix(QV.analyser_question, produit_touche="2")
+    tour = jouer("VOIX", "texte:quel est le prix du haricot à Houndjro")
+    assert tour.etat == "CHOIX_VARIETE" and "haricot noir, tapez 2" in texte(tour)
+    t = texte(jouer("TOUCHE", "2"))
+    assert "Haricot noir" in t

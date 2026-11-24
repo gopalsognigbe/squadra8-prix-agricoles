@@ -15,5 +15,7 @@ Le détail du déroulé et le plan B (PC + tunnel Cloudflare si la machine en li
 3. Quand la console attend la voix :
    - `v data/test_touche3/wav/Q03.wav` : vraie chaîne (transcription Groq, sinon Whisper local, puis IA) ;
    - `t on me propose 125 francs le kilo de maïs blanc à Bohicon` : saute la transcription.
-4. Si la couleur (maïs, haricot) ou le poids du sac n'est pas dit, le service le demande au clavier.
-5. Repli : si la transcription ou l'IA échoue, ou si `QUESTION_VOIX_ACTIVE=false`, le service dit « Cette fonction arrive bientôt. » et revient au menu.
+4. L'appelant peut dire la ville ou le marché : Abomey ↔ Houndjro, Covè ↔ Azogotchébou, Bohicon ↔ Bohicon (variantes tolérées : abomé, kove, houndjoro…). L'annonce dit toujours le nom complet, par exemple « Houndjro (Abomey) ».
+5. Le montant de l'offre peut être dit en chiffres ou en lettres (« quinze mille », « 15 000 », « vingt-cinq mille cinq cents »). Il est lu par l'IA et par une règle de secours ; s'ils ne sont pas d'accord, ou s'il manque, le service le fait taper.
+6. Si la couleur (maïs, haricot) ou le poids du sac n'est pas dit, le service le demande au clavier.
+7. Repli : si la transcription ou l'IA échoue, ou si `QUESTION_VOIX_ACTIVE=false`, le service dit « Cette fonction arrive bientôt. » et revient au menu.
