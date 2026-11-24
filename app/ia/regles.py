@@ -46,7 +46,23 @@ def comprendre_par_regles(texte: str) -> dict:
     produit = _trouver(PRODUITS, n)
     marche = _trouver(MARCHES, n)
 
-    if any(m in n for m in ("juger", "offre", "proposer", "proposition", "acheter a")):
+    if any(
+        m in n
+        for m in (
+            "juger",
+            "offre",
+            "propose",
+            "proposition",
+            "acheter a",
+            "c'est bon",
+            "c est bon",
+            "c'est correct",
+            "c est correct",
+            "accepter",
+            "me payer",
+            "bon prix",
+        )
+    ):
         intention = "juger_offre"
     elif any(m in n for m in ("prix", "coute", "coûte", "combien", "tarif", "cours")):
         intention = "prix"

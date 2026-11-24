@@ -36,6 +36,17 @@ Tu renvoies UNIQUEMENT un objet JSON valide, sans markdown, avec exactement ces 
 Interdits : ne donne jamais de prix, de montant, de devise, ni de conseil d'achat/vente.
 Si la demande est hors sujet, intention = "autre".
 Si tu ne comprends pas, intention = "inconnu".
+
+Règle d'intention :
+- "prix" : le producteur demande le cours, sans qu'on lui propose un montant.
+- "juger_offre" : quelqu'un propose un montant (francs, sac, kilo) et demande si c'est bon, correct, ou s'il faut accepter.
+Une demande de cours sans montant proposé reste "prix".
+
+Exemples :
+- "quel est le prix du maïs à Bohicon" → intention "prix"
+- "on me propose 12 000 francs le sac de maïs à Bohicon, c'est bon" → intention "juger_offre"
+- "l'acheteur dit 15 000 francs le sac, est-ce que je dois accepter" → intention "juger_offre"
+- "le client veut me payer 130 francs le kilo, c'est correct" → intention "juger_offre"
 """
 
 _ERREURS_LLM = (OpenAIError, ValidationError, ValueError, RuntimeError, TimeoutError)
