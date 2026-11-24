@@ -302,7 +302,7 @@ def afficher_rapport(lignes: list[dict], modele_whisper: str) -> None:
         print(
             f"  ATTEINT ({taux:.1f} %, médiane {mediane:.3f} s) → recommandation : montrer la touche 3"
         )
-        print("  (après I5 seulement ; ne pas activer question_voix_active dans cette PR).")
+        print("  (touche 3 branchée : QUESTION_VOIX_ACTIVE=true dans .env pour la montrer).")
     else:
         print(f"  NON ATTEINT ({taux:.1f} %, médiane {mediane:.3f} s) → « bientôt disponible ».")
     if latences and max(latences) > 6:
@@ -315,14 +315,16 @@ def executer(
     dossier_wav: Path,
     sortie: Path,
     modele_whisper: str,
+    pause_s: float = 0.0,
 ) -> list[dict]:
     """Parcourt le classeur, lance la vraie chaîne, écrit la copie de résultats."""
     # Import tardif : openpyxl n'est pas dans requirements.txt (script manuel).
     import openpyxl
 
     from app.config import get_settings
+    from app.ia.delais import nouvelle_echeance
     from app.ia.intention import comprendre
-    from app.ia.transcription import AudioTropLong, transcrire_detail
+    from app.ia.transcription import AudioTropLong, prechauffer_local, transcrire_detail
 
     get_settings.cache_clear()
     settings = get_settings()
@@ -330,8 +332,11 @@ def executer(
         f"Réglages : whisper_modele={settings.whisper_modele} "
         f"audio_max_s={settings.audio_max_s} "
         f"clé Groq={'oui' if (settings.openai_api_key or '').strip() else 'non'} "
-        f"clé Gemini={'oui' if (settings.gemini_api_key or '').strip() else 'non'}"
+        f"clé Gemini={'oui' if (settings.gemini_api_key or '').strip() else 'non'} "
+        f"ia_delai_max_s={settings.ia_delai_max_s} pause={pause_s}s"
     )
+    # Comme au téléphone : Whisper local chargé avant le premier appel.
+    prechauffer_local()
     if settings.whisper_modele != modele_whisper:
         print(
             f"Attention : --modele={modele_whisper} mais settings={settings.whisper_modele}. "
@@ -400,11 +405,14 @@ def executer(
         debut = None
         try:
             wav = preparer_wav(str(nom_audio or "").strip(), dossier_audios, dossier_wav)
+            if pause_s > 0 and lignes:
+                time.sleep(pause_s)  # quota gratuit Groq : hors latence mesurée
             debut = time.perf_counter()
-            tr = transcrire_detail(wav)
+            echeance = nouvelle_echeance()  # même budget qu'un vrai appel (IA_DELAI_MAX_S)
+            tr = transcrire_detail(wav, echeance=echeance)
             texte = (tr.get("texte") or "").strip()
             enregistrement["moteur_transcription"] = tr.get("moteur") or ""
-            detail = comprendre(texte)
+            detail = comprendre(texte, echeance=echeance)
             enregistrement["latence_s"] = round(time.perf_counter() - debut, 3)
             enregistrement["moteur_intention"] = (detail or {}).get("source") or ""
         except AudioTropLong as exc:
@@ -464,6 +472,12 @@ def construire_parser() -> argparse.ArgumentParser:
         "--sortie", type=Path, required=True, help="copie xlsx remplie (ne pas écraser la source)"
     )
     parser.add_argument(
+        "--pause",
+        type=float,
+        default=0.0,
+        help="pause en secondes entre deux audios (ex. 1.5) pour ne pas saturer le quota Groq",
+    )
+    parser.add_argument(
         "--modele",
         default="base",
         help="modèle faster-whisper (ex. base ou small) ; définit WHISPER_MODELE avant les imports IA",
@@ -486,6 +500,7 @@ def main(argv: list[str] | None = None) -> int:
         dossier_wav=args.wav,
         sortie=args.sortie,
         modele_whisper=args.modele,
+        pause_s=max(0.0, args.pause),
     )
     return 0
 

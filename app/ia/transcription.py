@@ -21,6 +21,13 @@ from pathlib import Path
 import httpx
 
 from app.config import get_settings
+from app.ia.delais import (
+    TIMEOUT_MIN_S,
+    attente_429,
+    nouvelle_echeance,
+    reessai_possible,
+    restant,
+)
 from app.services.source_prix import ORDRE_MARCHES
 from data.scripts.maj_fao import MARCHES_MVP, PRODUITS_MVP
 
@@ -62,7 +69,11 @@ def _controler(duree: float) -> None:
         raise AudioTropLong(f"{duree:.1f} s au lieu de {maxi:.0f} s au plus")
 
 
-def _groq(chemin: str | Path) -> tuple[str, float]:
+# Temps gardé pour le repli (Whisper local) et l'intention après Groq.
+RESERVE_APRES_GROQ_S = 2.0
+
+
+def _groq(chemin: str | Path, timeout: float | None = None) -> tuple[str, float]:
     settings = get_settings()
     with open(chemin, "rb") as f:
         r = httpx.post(
@@ -76,7 +87,7 @@ def _groq(chemin: str | Path) -> tuple[str, float]:
                 "prompt": INDICE,
             },
             files={"file": (Path(chemin).name, f)},
-            timeout=float(settings.groq_timeout_s),
+            timeout=float(timeout if timeout is not None else settings.groq_timeout_s),
         )
     r.raise_for_status()
     j = r.json()
@@ -87,24 +98,43 @@ _modele = None
 _verrou = threading.Lock()
 
 
-def _local(chemin: str | Path) -> tuple[str, float]:
+def _charger_modele_local():
+    """Charge le modèle Whisper local une seule fois (à appeler sous _verrou)."""
     global _modele
+    if _modele is None:
+        from faster_whisper import WhisperModel  # import tardif
+
+        settings = get_settings()
+        dossier = Path(settings.whisper_modeles_dir)
+        if not dossier.is_absolute():
+            dossier = RACINE / dossier
+        _modele = WhisperModel(
+            settings.whisper_modele,
+            device="cpu",
+            compute_type="int8",
+            cpu_threads=int(settings.whisper_threads),
+            download_root=str(dossier),
+        )
+    return _modele
+
+
+def prechauffer_local() -> bool:
+    """Charge Whisper local à l'avance, pour que le repli ne coûte pas le
+    chargement du modèle pendant un appel. Faux si faster-whisper manque."""
+    try:
+        with _verrou:
+            _charger_modele_local()
+        return True
+    except Exception as e:  # noqa: BLE001
+        log.warning("Préchauffage Whisper local impossible : %s", e)
+        return False
+
+
+def _local(chemin: str | Path) -> tuple[str, float]:
     settings = get_settings()
     with _verrou:
-        if _modele is None:
-            from faster_whisper import WhisperModel  # import tardif
-
-            dossier = Path(settings.whisper_modeles_dir)
-            if not dossier.is_absolute():
-                dossier = RACINE / dossier
-            _modele = WhisperModel(
-                settings.whisper_modele,
-                device="cpu",
-                compute_type="int8",
-                cpu_threads=int(settings.whisper_threads),
-                download_root=str(dossier),
-            )
-        segments, info = _modele.transcribe(
+        _modele_local = _charger_modele_local()
+        segments, info = _modele_local.transcribe(
             str(chemin),
             language="fr",
             vad_filter=True,
@@ -117,12 +147,34 @@ def _local(chemin: str | Path) -> tuple[str, float]:
     return texte, info.duration
 
 
-def transcrire_detail(chemin_audio: str | Path) -> dict:
+def _groq_dans_le_budget(chemin: str | Path, echeance: float) -> tuple[str, float]:
+    """Groq avec délai raccourci et un seul réessai court après un 429."""
+    maxi = float(get_settings().groq_timeout_s)
+    for essai in range(2):
+        timeout = min(maxi, restant(echeance) - RESERVE_APRES_GROQ_S)
+        if timeout < TIMEOUT_MIN_S:
+            raise TimeoutError("plus de temps pour Groq, repli local")
+        try:
+            return _groq(chemin, timeout)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code != 429 or essai == 1:
+                raise
+            attente = attente_429(e.response.headers)
+            if not reessai_possible(attente, echeance, RESERVE_APRES_GROQ_S):
+                raise
+            log.info("Groq 429 (transcription), réessai dans %.2f s", attente)
+            time.sleep(attente)
+    raise RuntimeError("inaccessible")
+
+
+def transcrire_detail(chemin_audio: str | Path, echeance: float | None = None) -> dict:
+    """Transcrit. echeance (time.monotonic) : fin du budget de la question."""
     debut = time.perf_counter()
+    echeance = echeance if echeance is not None else nouvelle_echeance()
     resultat, moteur = None, "local"
     if _cle_groq():
         try:
-            resultat, moteur = _groq(chemin_audio), "groq"
+            resultat, moteur = _groq_dans_le_budget(chemin_audio, echeance), "groq"
         except Exception as e:
             log.warning("Groq indisponible (%s), repli sur Whisper local", e)
     if resultat is None:
@@ -137,6 +189,6 @@ def transcrire_detail(chemin_audio: str | Path) -> dict:
     }
 
 
-def transcrire(chemin_audio: str | Path) -> str:
+def transcrire(chemin_audio: str | Path, echeance: float | None = None) -> str:
     """Écrit en texte ce qui a été dit (interface du squelette)."""
-    return transcrire_detail(chemin_audio)["texte"]
+    return transcrire_detail(chemin_audio, echeance)["texte"]
