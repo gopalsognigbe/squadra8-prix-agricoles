@@ -20,7 +20,7 @@ from app.config import get_settings
 from app.db.models import Marche, Prix, Produit, Source
 from app.db.session import session_scope
 from app.ia.anomalies import analyser_prix
-from app.services.calculs import arrondir_f, vers_100kg
+from app.services.calculs import arrondir_au_franc, vers_100kg
 from data.scripts.maj_fao import MARCHES_MVP, PRODUITS_MVP
 
 logger = logging.getLogger(__name__)
@@ -82,7 +82,7 @@ def _formater_prix(ligne: dict[str, Any]) -> dict[str, Any]:
         "prix_kg": prix_kg,
         "prix_fcfa": prix_kg,
         "prix_100kg": vers_100kg(prix_kg),
-        "prix_kg_annonce": arrondir_f(prix_kg),
+        "prix_kg_annonce": arrondir_au_franc(prix_kg),
         "date_releve": ligne["date"],
         "source": ligne.get("source") or "",
         "unite": ligne.get("unite") or "",
@@ -115,7 +115,7 @@ def _formater_prix_base(
 ) -> dict[str, Any]:
     """Format base : annonces au franc près (pas aux 5 F)."""
     brut = float(prix_fcfa)
-    annonce = int(round(brut))
+    annonce = arrondir_au_franc(brut)
     return {
         "produit": produit,
         "marche": marche,

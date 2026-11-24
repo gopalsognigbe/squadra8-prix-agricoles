@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.services.calculs import arrondir_f, juger_offre, vers_100kg
+from app.services.calculs import arrondir_au_franc, arrondir_f, juger_offre, vers_100kg
 
 
 def test_juger_offre_au_dessus() -> None:
@@ -70,3 +70,11 @@ def test_arrondir_f() -> None:
     assert arrondir_f(252.0) == 250
     assert arrondir_f(253.0) == 255
     assert arrondir_f(250.0) == 250
+
+
+def test_arrondir_au_franc() -> None:
+    assert arrondir_au_franc(137.36) == 137
+    assert arrondir_au_franc(253.0) == 253
+    assert arrondir_au_franc(137.36) != arrondir_f(137.36)
+    assert arrondir_f(137.36) == 135
+    assert arrondir_f(253.0) == 255
