@@ -49,7 +49,15 @@ class Settings(BaseSettings):
     admin_password_initial: str = ""
     admin_session_secret: str = ""
     question_voix_active: bool = False
-    whisper_modele: str = "small"
+    # Whisper local : « base » est le plus léger des deux modèles prévus (repli démo).
+    whisper_modele: str = "base"
+    whisper_modeles_dir: str = "models/whisper"
+    whisper_beam: int = 1
+    whisper_threads: int = 0
+    # Transcription I2 (Groq Whisper en premier, puis local).
+    groq_modele: str = "whisper-large-v3-turbo"
+    groq_timeout_s: float = 6.0
+    audio_max_s: float = 8.0
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_phone_number: str = ""
