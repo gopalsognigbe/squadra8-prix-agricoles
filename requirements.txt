@@ -3,6 +3,7 @@ fastapi>=0.115,<0.125
 uvicorn[standard]>=0.32,<0.35
 sqlalchemy>=2.0.36,<2.1
 alembic>=1.14,<2
+bcrypt>=4.2,<6
 psycopg[binary]>=3.2,<3.3
 pydantic-settings>=2.6,<3
 python-dotenv>=1.0,<2

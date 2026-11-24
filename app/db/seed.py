@@ -1,4 +1,4 @@
-"""Chargement idempotent des produits et marchés depuis les CSV."""
+"""Chargement idempotent des produits, marchés, sources et admin."""
 
 from __future__ import annotations
 
@@ -6,14 +6,19 @@ import csv
 from pathlib import Path
 from typing import TypeVar
 
+import bcrypt
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import Marche, Produit
+from app.config import get_settings
+from app.db.models import Marche, Produit, Source, Utilisateur
 from app.db.session import get_session_factory
+from data.scripts.import_fpma import SOURCE_CODE
 
 T = TypeVar("T", Produit, Marche)
 SEEDS_DIR = Path(__file__).resolve().parents[2] / "data" / "seeds"
+
+SOURCE_SAISIE = "saisie"
 
 
 def _bool_value(value: str, *, field: str) -> bool:
@@ -86,8 +91,57 @@ def charger_donnees(session: Session, dossier: Path = SEEDS_DIR) -> dict[str, in
     }
 
 
+def charger_sources_et_admin(session: Session) -> dict[str, int]:
+    """Ajoute les sources FAO/saisie et le compte admin initial (si demandé)."""
+    ajoutes = {"sources": 0, "admin": 0}
+    sources = [
+        {
+            "code": SOURCE_CODE,
+            "nom": "FPMA – SIM-Bénin",
+            "url": "https://fpma.review.fao.org/",
+            "licence": "Source publique FPMA",
+        },
+        {
+            "code": SOURCE_SAISIE,
+            "nom": "Saisie manuelle",
+            "url": None,
+            "licence": None,
+        },
+    ]
+    for row in sources:
+        if session.scalar(select(Source).where(Source.code == row["code"])) is None:
+            session.add(Source(**row))
+            ajoutes["sources"] += 1
+
+    settings = get_settings()
+    if settings.admin_email and settings.admin_password_initial:
+        email = settings.admin_email.strip().lower()
+        if session.scalar(select(Utilisateur).where(Utilisateur.email == email)) is None:
+            hashed = bcrypt.hashpw(
+                settings.admin_password_initial.encode(),
+                bcrypt.gensalt(),
+            ).decode()
+            session.add(
+                Utilisateur(
+                    email=email,
+                    nom_affiche="Administrateur",
+                    role="admin",
+                    mot_de_passe_hash=hashed,
+                    actif=True,
+                )
+            )
+            ajoutes["admin"] = 1
+    return ajoutes
+
+
 def run() -> dict[str, int]:
-    """Charge les CSV dans une transaction et retourne le nombre d'insertions."""
+    """Charge les CSV, sources et admin dans une transaction."""
     factory = get_session_factory()
     with factory.begin() as session:
-        return charger_donnees(session)
+        resume = charger_donnees(session)
+        resume.update(charger_sources_et_admin(session))
+        return resume
+
+
+if __name__ == "__main__":
+    print(run())

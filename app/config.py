@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     hash_pepper: str = ""
     admin_email: str = ""
     admin_password_initial: str = ""
+    admin_session_secret: str = ""
     question_voix_active: bool = False
     whisper_modele: str = "small"
     twilio_account_sid: str = ""
@@ -57,7 +58,7 @@ class Settings(BaseSettings):
     maj_fao_au_demarrage: bool = True
     maj_fao_tout_benin: bool = False
 
-    # Source des prix touche 1 : "fao" (CSV) ou "base" (pas encore prêt).
+    # Source des prix touche 1 : "fao" (CSV) ou "base" (prix validés).
     source_prix: str = "fao"
     prix_fao_csv: str = "data/raw/prix_fao.csv"
 

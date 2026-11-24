@@ -215,9 +215,20 @@ def test_post_api_offre_sans_reference() -> None:
     assert "verdict" not in data
 
 
-def test_source_base_non_prete() -> None:
-    os.environ["SOURCE_PRIX"] = "base"
+def test_source_base_non_prete(tmp_path, monkeypatch) -> None:
+    """Base SQLite vide : SourceBase, pas d'erreur ; prix_du_jour → []."""
+    from app.db.models import Base
+    from app.db.session import get_engine, reinitialiser_moteur_pour_tests
+    from app.services.source_prix import SourceBase
+
+    db_path = tmp_path / "vide.sqlite"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite+pysqlite:///{db_path}")
+    monkeypatch.setenv("SOURCE_PRIX", "base")
     get_settings.cache_clear()
     get_source_prix.cache_clear()
-    with pytest.raises(RuntimeError, match="base non prête"):
-        get_source_prix().prix_du_jour("Maïs Blanc")
+    reinitialiser_moteur_pour_tests()
+    Base.metadata.create_all(get_engine())
+
+    source = get_source_prix()
+    assert isinstance(source, SourceBase)
+    assert source.prix_du_jour("Maïs Blanc") == []

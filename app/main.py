@@ -11,6 +11,8 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
 from app.api import admin, ia, prix, sim, twilio
 from app.config import get_settings
@@ -57,6 +59,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.state.settings = get_settings()
+_admin_dir = Path(__file__).resolve().parents[1] / "web" / "admin"
+if _admin_dir.is_dir():
+    app.mount("/admin", StaticFiles(directory=_admin_dir, html=True), name="admin")
 
 app.include_router(sim.router, prefix="/api/sim", tags=["simulateur"])
 app.include_router(prix.router, prefix="/api", tags=["prix"])

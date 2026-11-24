@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Squadra 8 — Administration des prix</title>
+<style>
+:root{font-family:system-ui,sans-serif;color:#17221c;background:#f4f7f4}body{margin:0}header{background:#155b3b;color:white;padding:20px 5vw}main{max-width:1100px;margin:28px auto;padding:0 18px}.card{background:white;border-radius:12px;padding:22px;margin:16px 0;box-shadow:0 2px 12px #0000000c}input,select,button{font:inherit;padding:10px;border:1px solid #ccd6ce;border-radius:7px;margin:5px}button{background:#17633f;color:white;border:0;cursor:pointer}button.secondary{background:#52645a}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:10px;border-bottom:1px solid #e5ebe6}small,.muted{color:#607267}.hidden{display:none}.actions button{margin:2px}.alert{color:#a13b20}.grid{display:flex;flex-wrap:wrap;gap:8px}.grid>*{flex:1;min-width:140px}
+</style></head>
+<body>
+<header><h1>Squadra 8 · Prix agricoles</h1><div>Administration — validation humaine des données FPMA</div></header>
+<main>
+<section id="login" class="card"><h2>Connexion</h2><form id="loginForm"><input name="email" type="email" placeholder="Adresse e-mail" required><input name="password" type="password" placeholder="Mot de passe" required><button>Se connecter</button></form><p id="loginMsg" class="alert"></p></section>
+<section id="app" class="hidden">
+<div class="card"><strong id="who"></strong> <button class="secondary" id="logout">Déconnexion</button>
+<h2>Prix à traiter</h2><button id="refresh">Actualiser</button> <button id="import">Importer les données FPMA</button><span id="status" class="muted"></span>
+<div style="overflow:auto"><table><thead><tr><th>Produit / marché</th><th>Prix</th><th>Date</th><th>Source</th><th>Score / alerte</th><th>Décision</th></tr></thead><tbody id="rows"></tbody></table></div>
+</div>
+<div class="card"><h2>Saisie manuelle</h2><form id="entry"><div class="grid">
+<select name="produit"><option value="mais_blanc">Maïs Blanc</option><option value="mais_jaune">Maïs Jaune</option><option value="soja">Soja</option><option value="haricot_blanc">Haricot blanc</option><option value="haricot_noir">Haricot noir</option><option value="haricot_rouge">Haricot rouge</option></select>
+<select name="marche"><option value="bohicon">Bohicon</option><option value="houndjro">Houndjro (Abomey)</option><option value="azogotchebou">Azogotchébou (Covè)</option></select>
+<input name="prix_fcfa" type="number" min="1" step=".01" placeholder="Prix FCFA" required>
+<select name="unite"><option value="kg">kg</option><option value="sac_100kg">Sac 100 kg</option></select>
+<select name="type_prix"><option value="detail">Détail</option><option value="gros">Gros</option></select>
+<input name="date_releve" type="date" required></div><button>Enregistrer en attente</button></form><p id="entryMsg"></p></div>
+</section></main>
+<script>
+const $=s=>document.querySelector(s), api=async(path,opts={})=>{const r=await fetch('/api/admin'+path,{credentials:'same-origin',...opts,headers:{'Content-Type':'application/json',...(opts.headers||{})}});let d={};try{d=await r.json()}catch{}if(!r.ok)throw Error(d.detail||'Erreur serveur');return d};
+const esc=v=>String(v??'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])).replaceAll(String.fromCharCode(39),'&#39;');
+function showApp(user){$('#login').classList.add('hidden');$('#app').classList.remove('hidden');$('#who').textContent=user.nom+' ('+user.role+')';load()}
+async function load(){try{const rows=await api('/prix?statut=en_attente');$('#rows').innerHTML=rows.map(p=>'<tr><td>'+esc(p.produit)+'<br><small>'+esc(p.marche)+'</small></td><td>'+esc(p.prix_fcfa)+' F / '+esc(p.unite)+'</td><td>'+esc(p.date_releve)+'</td><td>'+esc(p.source)+'</td><td class="alert">'+(p.score_anomalie==null?'—':esc(p.score_anomalie))+'<br>'+esc(p.motif_anomalie||'À examiner')+'</td><td class="actions"><button data-ok="'+Number(p.id)+'">Valider</button><button class="secondary" data-no="'+Number(p.id)+'">Rejeter</button></td></tr>').join('')||'<tr><td colspan="6">Aucun prix en attente.</td></tr>';$('#status').textContent=rows.length+' prix en attente';}catch(e){$('#status').textContent=e.message}}
+$('#loginForm').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{const u=await api('/login',{method:'POST',body:JSON.stringify({email:f.get('email'),password:f.get('password')})});showApp(u.utilisateur)}catch(err){$('#loginMsg').textContent=err.message}};
+$('#refresh').onclick=load;
+$('#logout').onclick=async()=>{await api('/logout',{method:'POST'});location.reload()};
+$('#import').onclick=async()=>{if(!confirm('Importer les nouvelles observations FPMA en attente de validation ?'))return;try{const r=await api('/import/fpma',{method:'POST'});$('#status').textContent=r.nouveaux+' nouveaux prix importés';load()}catch(e){$('#status').textContent=e.message}};
+$('#entry').onsubmit=async e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target));try{await api('/prix',{method:'POST',body:JSON.stringify(f)});$('#entryMsg').textContent='Prix enregistré en attente de validation.';e.target.reset();load()}catch(err){$('#entryMsg').textContent=err.message}};
+$('#rows').onclick=async e=>{const ok=e.target.dataset.ok,no=e.target.dataset.no;if(ok){if(!confirm('Confirmer la validation de ce prix ?'))return;try{await api('/prix/'+ok+'/valider',{method:'POST'});load()}catch(err){alert(err.message)}}if(no){const motif=prompt('Motif obligatoire du rejet :');if(!motif)return;try{await api('/prix/'+no+'/rejeter',{method:'POST',body:JSON.stringify({motif})});load()}catch(err){alert(err.message)}}};
+(async()=>{try{const u=await api('/me');showApp(u)}catch{}})();
+</script></body></html>

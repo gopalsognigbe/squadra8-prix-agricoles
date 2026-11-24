@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from collections.abc import Generator
+from contextlib import contextmanager
+from functools import lru_cache
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
@@ -28,10 +29,31 @@ def get_session_factory() -> sessionmaker[Session]:
     return sessionmaker(bind=get_engine(), autoflush=False, expire_on_commit=False)
 
 
+def nouvelle_session() -> Session:
+    """Construit une session indépendante."""
+    return get_session_factory()()
+
+
 def get_session() -> Generator[Session, None, None]:
     """Dépendance FastAPI : ouvre une session et la ferme toujours."""
-    session = get_session_factory()()
+    session = nouvelle_session()
     try:
         yield session
     finally:
         session.close()
+
+
+@contextmanager
+def session_scope() -> Generator[Session, None, None]:
+    """Session contextuelle pour scripts et services synchrones."""
+    session = nouvelle_session()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+def reinitialiser_moteur_pour_tests() -> None:
+    """Vide les caches après changement de DATABASE_URL en tests."""
+    get_engine.cache_clear()
+    get_session_factory.cache_clear()

@@ -325,10 +325,10 @@ def _charger_depuis_base(prix_ids: list[Any]) -> list[dict[str, Any]]:
             "Modèle Prix indisponible : passer prix_a_analyser=... pour tester."
         )
 
-    from app.db.session import get_session  # type: ignore[attr-defined]
+    from app.db.session import session_scope
 
     resultats: list[dict[str, Any]] = []
-    with get_session() as session:  # noqa: SIM117 — API session future
+    with session_scope() as session:  # noqa: SIM117 — API session future
         for prix_id in prix_ids:
             row = session.get(modele_prix, prix_id)
             if row is None:
