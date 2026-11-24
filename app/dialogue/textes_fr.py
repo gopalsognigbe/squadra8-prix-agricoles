@@ -27,10 +27,34 @@ TEXTES = {
     "O02": "Ce montant n'est pas valide.",
     "X01": "Posez votre question après le bip.",
     "D01": "Il n'y a pas de prix récent pour ce produit.",
+    # Touche 3 (question à voix haute)
+    "X02": "Votre question est trop longue. Posez-la en une phrase courte.",
+    "X03": "Je peux donner le prix du maïs, du soja ou du haricot, ou juger l'offre d'un acheteur.",
+    "V01": "Pour le maïs blanc, tapez 1. Pour le maïs jaune, tapez 2.",
+    "V02": "Pour le haricot blanc, tapez 1. Pour le haricot noir, tapez 2. Pour le haricot rouge, tapez 3.",
+    "O03": "Je n'ai pas bien compris le montant.",
+    "O04": "Si c'est un sac de 100 kilos, tapez 1. Sinon, tapez 2.",
+    "D02": "Il n'y a pas de prix récent pour ce produit sur ce marché.",
 }
 
-NOMS_PRODUITS = {"mais": "Maïs blanc", "soja": "Soja", "haricot": "Haricot blanc"}
+NOMS_PRODUITS = {
+    "mais": "Maïs blanc",
+    "soja": "Soja",
+    "haricot": "Haricot blanc",
+    # Produits précisés par la touche 3 (couleur dite ou choisie par l'appelant).
+    "mais blanc": "Maïs blanc",
+    "mais jaune": "Maïs jaune",
+    "haricot blanc": "Haricot blanc",
+    "haricot noir": "Haricot noir",
+    "haricot rouge": "Haricot rouge",
+}
 TOUCHE_PRODUIT = {"1": "mais", "2": "soja", "3": "haricot"}
+
+# Touche 3 : couleur demandée quand l'appelant ne l'a pas dite (jamais devinée).
+CHOIX_VARIETES = {
+    "mais": ("V01", {"1": "blanc", "2": "jaune"}),
+    "haricot": ("V02", {"1": "blanc", "2": "noir", "3": "rouge"}),
+}
 
 
 def _prix_annonce_kg(p: dict) -> int:
@@ -83,3 +107,8 @@ def phrases_offre(o: dict) -> list[str]:
         ),
         jugement,
     ]
+
+
+def phrase_offre_sac(montant: int) -> str:
+    """Rappelle le montant dit pour un sac dont le poids n'est pas précisé."""
+    return f"L'acheteur propose {en_lettres(montant)} {francs(montant)} le sac."

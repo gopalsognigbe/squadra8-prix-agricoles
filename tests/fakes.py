@@ -76,16 +76,26 @@ class FakeJournal:
         self.lignes.append((appel_id, etape, entree))
 
 
-def services_fakes(*, sans_prix: bool = False, journal=None) -> Services:
-    def prix(produit: str) -> list[dict]:
-        return [] if sans_prix else list(PRIX.get(produit, []))
+def _question_en_panne(valeur: str) -> dict:
+    return {"erreur": "ia"}
 
-    def offre(produit: str, montant_sac: float) -> dict | None:
-        liste = [] if sans_prix else PRIX.get(produit, [])
+
+def services_fakes(*, sans_prix: bool = False, journal=None, question=None) -> Services:
+    def _liste(produit: str) -> list[dict]:
+        # « mais jaune » → prix de la famille « mais » (données de test seulement).
+        famille = (produit or "").split(" ")[0]
+        return [] if sans_prix else list(PRIX.get(famille, []))
+
+    def prix(produit: str) -> list[dict]:
+        return _liste(produit)
+
+    def offre(produit: str, montant_sac: float, marche: str | None = None) -> dict | None:
+        liste = _liste(produit)
         if not liste:
             return None
-        # Sans marché précisé : premier de la liste (Bohicon s'il est là).
-        ref = liste[0]
+        # Marché demandé s'il a un prix, sinon premier de la liste (Bohicon).
+        du_marche = [p for p in liste if p["marche"] == marche]
+        ref = du_marche[0] if du_marche else liste[0]
         offre_kg = float(montant_sac) / 100.0
         jugement = juger_offre(offre_kg, float(ref["prix_fcfa"]))
         return {
@@ -96,6 +106,7 @@ def services_fakes(*, sans_prix: bool = False, journal=None) -> Services:
             **jugement,
         }
 
-    if journal is None:
-        return Services(prix=prix, offre=offre)
-    return Services(prix=prix, offre=offre, journal=journal)
+    kw = {"question": question or _question_en_panne}
+    if journal is not None:
+        kw["journal"] = journal
+    return Services(prix=prix, offre=offre, **kw)

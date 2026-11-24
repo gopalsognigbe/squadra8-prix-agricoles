@@ -302,7 +302,7 @@ def afficher_rapport(lignes: list[dict], modele_whisper: str) -> None:
         print(
             f"  ATTEINT ({taux:.1f} %, médiane {mediane:.3f} s) → recommandation : montrer la touche 3"
         )
-        print("  (après I5 seulement ; ne pas activer question_voix_active dans cette PR).")
+        print("  (touche 3 branchée : QUESTION_VOIX_ACTIVE=true dans .env pour la montrer).")
     else:
         print(f"  NON ATTEINT ({taux:.1f} %, médiane {mediane:.3f} s) → « bientôt disponible ».")
     if latences and max(latences) > 6:
