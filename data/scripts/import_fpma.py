@@ -25,6 +25,7 @@ if str(RACINE) not in sys.path:
 
 from app.db.models import Marche, Prix, Produit, Source  # noqa: E402
 from app.db.session import get_session_factory  # noqa: E402
+from app.services.analyse_prix import analyser_et_marquer_prix  # noqa: E402
 
 CSV_DEFAUT = RACINE / "data" / "raw" / "prix_fao.csv"
 SOURCE_CODE = "FAO_FPMA"
@@ -147,18 +148,19 @@ def importer_lignes(
             resume["doublons"] += 1
             continue
 
-        session.add(
-            Prix(
-                produit_id=produit.id,
-                marche_id=marche.id,
-                prix_fcfa=montant,
-                unite=unite,
-                type_prix=type_prix,
-                date_releve=date_releve,
-                source_id=source.id,
-                statut="en_attente",
-            )
+        row = Prix(
+            produit_id=produit.id,
+            marche_id=marche.id,
+            prix_fcfa=montant,
+            unite=unite,
+            type_prix=type_prix,
+            date_releve=date_releve,
+            source_id=source.id,
+            statut="en_attente",
         )
+        session.add(row)
+        session.flush()
+        analyser_et_marquer_prix(session, row)
         resume["importees"] += 1
 
     if dry_run:

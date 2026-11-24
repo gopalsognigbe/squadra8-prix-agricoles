@@ -7,8 +7,13 @@ from __future__ import annotations
 
 
 def arrondir_f(montant: float) -> int:
-    """Arrondit aux 5 F les plus proches (annonce vocale)."""
+    """Arrondit aux 5 F les plus proches (hors annonces de prix)."""
     return int(round(montant / 5.0) * 5)
+
+
+def arrondir_au_franc(montant: float) -> int:
+    """Arrondit au franc le plus proche (annonces vocales et affichages)."""
+    return int(round(float(montant)))
 
 
 def vers_100kg(prix_kg: float) -> int:

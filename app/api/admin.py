@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db.models import Journal, Marche, Prix, Produit, Source, Utilisateur
 from app.db.session import get_session
+from app.services.analyse_prix import analyser_et_marquer_prix
 
 router = APIRouter()
 COOKIE = "squadra8_admin"
@@ -154,6 +155,7 @@ def creer_prix(body: PrixIn, db: Session = Depends(get_session),
     db.add(row)
     try:
         db.flush()
+        analyser_et_marquer_prix(db, row)
         _journal(db, user, "prix_creation", str(row.id))
         db.commit()
         db.refresh(row)

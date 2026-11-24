@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from app.dialogue.nombres import date_en_lettres, en_lettres, francs
-from app.services.calculs import vers_100kg
+from app.services.calculs import arrondir_au_franc, vers_100kg
 
 # Phrases fixes (mêmes identifiants que app/voix/phrases.csv)
 TEXTES = {
@@ -35,7 +35,7 @@ TOUCHE_PRODUIT = {"1": "mais", "2": "soja", "3": "haricot"}
 
 def _prix_annonce_kg(p: dict) -> int:
     """Prix au kilo annoncé : franc le plus proche (pas aux 5 F)."""
-    return int(round(float(p.get("prix_kg", p["prix_fcfa"]))))
+    return arrondir_au_franc(p.get("prix_kg", p["prix_fcfa"]))
 
 
 def phrase_entete_prix(produit: str) -> str:
