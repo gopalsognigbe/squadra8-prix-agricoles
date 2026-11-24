@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import logging
 
+from app.ia.delais import nouvelle_echeance
 from app.ia.intention import comprendre
 from app.ia.regles import (
     PRODUITS,
@@ -61,11 +62,13 @@ def _resultat(erreur: str | None, texte: str = "", **autres) -> dict:
 def analyser_question(valeur: str) -> dict:
     """Transcrit puis comprend la question. Ne lève jamais d'exception."""
     valeur = (valeur or "").strip()
+    # Un seul budget (IA_DELAI_MAX_S) pour transcription + intention : réponse < 6 s.
+    echeance = nouvelle_echeance()
     if valeur.startswith(PREFIXE_TEXTE):
         texte = valeur[len(PREFIXE_TEXTE):].strip()
     else:
         try:
-            texte = transcrire(valeur)
+            texte = transcrire(valeur, echeance=echeance)
         except AudioTropLong as exc:
             logger.info("Question trop longue : %s", exc)
             return _resultat("trop_long")
@@ -77,7 +80,7 @@ def analyser_question(valeur: str) -> dict:
         return _resultat("vide")
 
     try:
-        compris = comprendre(texte)
+        compris = comprendre(texte, echeance=echeance)
     except Exception as exc:  # noqa: BLE001
         logger.warning("Intention impossible : %s", exc)
         return _resultat("ia", texte)
@@ -110,7 +113,10 @@ def _fusionner(texte: str, compris: dict) -> dict:
     if not isinstance(ia_montant, int) or ia_montant <= 0 or not groupes_nombres(texte):
         ia_montant = None  # aucun nombre dans la phrase : montant de l'IA refusé
     montant = _accord(ia_montant, regle["montant"])
-    unite = _accord(compris.get("unite_offre"), regle["unite"])
+    ia_unite = compris.get("unite_offre")
+    if regle["unite"] is None:
+        ia_unite = None  # aucun mot d'unité (kilo, sac) dans la phrase : on demandera
+    unite = _accord(ia_unite, regle["unite"])
 
     return _resultat(
         None,

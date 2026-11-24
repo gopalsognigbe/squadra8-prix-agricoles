@@ -57,7 +57,7 @@ def test_defaut_whisper_modele_base() -> None:
 def test_groq_en_premier(monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "gsk_x")
     get_settings.cache_clear()
-    monkeypatch.setattr(t, "_groq", lambda c: ("prix du maïs", 3.0))
+    monkeypatch.setattr(t, "_groq", lambda c, *a: ("prix du maïs", 3.0))
     monkeypatch.setattr(t, "_local", _interdit)
     r = t.transcrire_detail("x.wav")
     assert r["texte"] == "prix du maïs" and r["moteur"] == "groq"
@@ -66,7 +66,7 @@ def test_groq_en_premier(monkeypatch):
 
 
 def test_repli_local_si_groq_echoue(monkeypatch):
-    def ko(c):
+    def ko(c, *a):
         raise RuntimeError("réseau")
 
     monkeypatch.setenv("GROQ_API_KEY", "gsk_x")
@@ -86,7 +86,7 @@ def test_sans_cle_groq_pas_appele(monkeypatch):
 def test_audio_trop_long_sans_repli(monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "gsk_x")
     get_settings.cache_clear()
-    monkeypatch.setattr(t, "_groq", lambda c: ("bla", 9.0))
+    monkeypatch.setattr(t, "_groq", lambda c, *a: ("bla", 9.0))
     monkeypatch.setattr(t, "_local", _interdit)
     with pytest.raises(t.AudioTropLong):
         t.transcrire("x.wav")
@@ -96,7 +96,7 @@ def test_duree_maximale_reglable(monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "gsk_x")
     monkeypatch.setenv("AUDIO_MAX_S", "12")
     get_settings.cache_clear()
-    monkeypatch.setattr(t, "_groq", lambda c: ("ok", 9.0))
+    monkeypatch.setattr(t, "_groq", lambda c, *a: ("ok", 9.0))
     assert t.transcrire("x.wav") == "ok"
 
 

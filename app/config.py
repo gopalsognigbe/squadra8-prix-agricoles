@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     groq_modele: str = "whisper-large-v3-turbo"
     groq_timeout_s: float = 6.0
     audio_max_s: float = 8.0
+    # Budget total d'une question vocale (transcription + intention), sous les 6 s de G8.
+    ia_delai_max_s: float = 5.5
+    # Attente maximale avant l'unique réessai après un 429 Groq (quota).
+    groq_reessai_max_s: float = 1.5
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_phone_number: str = ""

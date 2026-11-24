@@ -25,3 +25,4 @@ V02;Pour le haricot blanc, tapez 1. Pour le haricot noir, tapez 2. Pour le haric
 O03;Je n'ai pas bien compris le montant.;
 O04;Si c'est un sac de 100 kilos, tapez 1. Sinon, tapez 2.;
 D02;Il n'y a pas de prix récent pour ce produit sur ce marché.;
+O05;Si c'est le prix d'un kilo, tapez 1. Si c'est le prix d'un sac de 100 kilos, tapez 2. Pour un autre sac, tapez 3.;

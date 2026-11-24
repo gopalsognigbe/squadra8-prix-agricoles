@@ -7,6 +7,8 @@ Touche 3 (QUESTION_VOIX_ACTIVE=true) : quand le moteur attend la voix, taper
 
 from __future__ import annotations
 
+import threading
+
 from app.config import get_settings
 from app.dialogue.moteur import Evenement, Moteur
 from app.dialogue.question_voix import PREFIXE_TEXTE
@@ -15,6 +17,11 @@ from app.dialogue.services_prix import services_reels
 
 def main() -> None:
     settings = get_settings()
+    if settings.question_voix_active:
+        # Whisper local chargé en fond : le repli ne coûte pas ce chargement en plein appel.
+        from app.ia.transcription import prechauffer_local
+
+        threading.Thread(target=prechauffer_local, daemon=True).start()
     moteur = Moteur(
         services_reels(),
         voix_active=settings.question_voix_active,

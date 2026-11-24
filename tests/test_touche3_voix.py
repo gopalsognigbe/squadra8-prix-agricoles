@@ -251,7 +251,7 @@ def test_trouver_variete(phrase, famille, attendu) -> None:
 
 # ---------- analyser_question (chaîne réelle, réseau remplacé) ----------
 def test_analyser_trop_long(monkeypatch) -> None:
-    def trop_long(_):
+    def trop_long(_, **k):
         raise AudioTropLong("10.7 s")
 
     monkeypatch.setattr(QV, "transcrire", trop_long)
@@ -259,7 +259,7 @@ def test_analyser_trop_long(monkeypatch) -> None:
 
 
 def test_analyser_echec_transcription(monkeypatch) -> None:
-    def panne(_):
+    def panne(_, **k):
         raise RuntimeError("réseau")
 
     monkeypatch.setattr(QV, "transcrire", panne)
@@ -267,12 +267,12 @@ def test_analyser_echec_transcription(monkeypatch) -> None:
 
 
 def test_analyser_vide(monkeypatch) -> None:
-    monkeypatch.setattr(QV, "transcrire", lambda _: "  ")
+    monkeypatch.setattr(QV, "transcrire", lambda _, **k: "  ")
     assert QV.analyser_question("q.wav")["erreur"] == "vide"
 
 
 def test_analyser_noms_fao_exacts(monkeypatch) -> None:
-    monkeypatch.setattr(QV, "comprendre", lambda t: {
+    monkeypatch.setattr(QV, "comprendre", lambda t, **k: {
         "intention": "juger_offre", "produit": "mais", "marche": "abomey", "confiance": 0.9})
     r = QV.analyser_question("texte:À Abomey on m'offre 11 000 francs le sac de maïs jaune")
     assert r["erreur"] is None and r["marche"] == "Houndjro (Abomey)"
@@ -281,12 +281,12 @@ def test_analyser_noms_fao_exacts(monkeypatch) -> None:
 
 
 def test_analyser_produit_inconnu_et_ia_en_panne(monkeypatch) -> None:
-    monkeypatch.setattr(QV, "comprendre", lambda t: {
+    monkeypatch.setattr(QV, "comprendre", lambda t, **k: {
         "intention": "prix", "produit": "igname", "marche": "parakou"})
     r = QV.analyser_question("texte:prix de l'igname à Parakou")
     assert r["famille"] is None and r["marche"] is None
 
-    def casse(_):
+    def casse(_, **k):
         raise RuntimeError("x")
 
     monkeypatch.setattr(QV, "comprendre", casse)
@@ -393,7 +393,7 @@ def _ia(monkeypatch, **reponse) -> None:
     base = {"intention": "juger_offre", "produit": "mais", "marche": None, "confiance": 0.9,
             "variete": None, "montant_offre": None, "unite_offre": None}
     base.update(reponse)
-    monkeypatch.setattr(QV, "comprendre", lambda t: base)
+    monkeypatch.setattr(QV, "comprendre", lambda t, **k: base)
 
 
 def test_ia_et_regle_d_accord(monkeypatch) -> None:
@@ -422,7 +422,7 @@ def test_desaccord_ia_regle_on_ne_devine_pas(monkeypatch) -> None:
 
 
 def test_regle_seule_quand_ia_tombe(monkeypatch) -> None:
-    monkeypatch.setattr(QV, "comprendre", comprendre_par_regles)
+    monkeypatch.setattr(QV, "comprendre", lambda t, **k: comprendre_par_regles(t))
     r = QV.analyser_question(
         "texte:à Kove on m'offre vingt-cinq mille cinq cents francs le sac de haricot noir")
     assert r["intention"] == "juger_offre" and r["famille"] == "haricot"
@@ -431,7 +431,7 @@ def test_regle_seule_quand_ia_tombe(monkeypatch) -> None:
 
 
 def test_parcours_complet_abome_quinze_mille_le_sac(monkeypatch) -> None:
-    monkeypatch.setattr(QV, "comprendre", comprendre_par_regles)
+    monkeypatch.setattr(QV, "comprendre", lambda t, **k: comprendre_par_regles(t))
     jouer, _, _ = appel_voix(QV.analyser_question)
     tour = jouer("VOIX", "texte:à Abomé on me propose quinze mille francs le sac de maïs jaune")
     assert tour.etat == "CONFIRMER_SAC" and "quinze mille francs le sac" in texte(tour)
@@ -441,7 +441,7 @@ def test_parcours_complet_abome_quinze_mille_le_sac(monkeypatch) -> None:
 
 
 def test_parcours_complet_couleur_absente_on_demande(monkeypatch) -> None:
-    monkeypatch.setattr(QV, "comprendre", comprendre_par_regles)
+    monkeypatch.setattr(QV, "comprendre", lambda t, **k: comprendre_par_regles(t))
     jouer, _, _ = appel_voix(QV.analyser_question, produit_touche="2")
     tour = jouer("VOIX", "texte:quel est le prix du haricot à Houndjro")
     assert tour.etat == "CHOIX_VARIETE" and "haricot noir, tapez 2" in texte(tour)

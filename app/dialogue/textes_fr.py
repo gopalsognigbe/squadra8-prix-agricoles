@@ -35,6 +35,7 @@ TEXTES = {
     "O03": "Je n'ai pas bien compris le montant.",
     "O04": "Si c'est un sac de 100 kilos, tapez 1. Sinon, tapez 2.",
     "D02": "Il n'y a pas de prix récent pour ce produit sur ce marché.",
+    "O05": "Si c'est le prix d'un kilo, tapez 1. Si c'est le prix d'un sac de 100 kilos, tapez 2. Pour un autre sac, tapez 3.",
 }
 
 NOMS_PRODUITS = {
@@ -112,3 +113,8 @@ def phrases_offre(o: dict) -> list[str]:
 def phrase_offre_sac(montant: int) -> str:
     """Rappelle le montant dit pour un sac dont le poids n'est pas précisé."""
     return f"L'acheteur propose {en_lettres(montant)} {francs(montant)} le sac."
+
+
+def phrase_offre_montant(montant: int) -> str:
+    """Rappelle le montant dit quand l'unité (kilo ou sac) n'est pas précisée."""
+    return f"L'acheteur propose {en_lettres(montant)} {francs(montant)}."

@@ -12,12 +12,20 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from typing import Any, Literal
 
-from openai import OpenAI, OpenAIError
+from openai import OpenAI, OpenAIError, RateLimitError
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from app.config import get_settings
+from app.ia.delais import (
+    TIMEOUT_MIN_S,
+    attente_429,
+    nouvelle_echeance,
+    reessai_possible,
+    restant,
+)
 from app.ia.regles import comprendre_par_regles
 
 logger = logging.getLogger(__name__)
@@ -108,11 +116,11 @@ class IntentionResult(BaseModel):
         return text or None
 
 
-def _client(api_key: str, base_url: str) -> OpenAI:
+def _client(api_key: str, base_url: str, timeout: float = TIMEOUT_SECONDS) -> OpenAI:
     return OpenAI(
         api_key=api_key,
         base_url=base_url,
-        timeout=TIMEOUT_SECONDS,
+        timeout=timeout,
         max_retries=0,
     )
 
@@ -143,11 +151,12 @@ def _appeler_llm(
     model: str,
     source: Sources,
     extra_options: dict[str, Any] | None = None,
+    timeout: float = TIMEOUT_SECONDS,
 ) -> IntentionResult:
     if not api_key:
         raise RuntimeError(f"clé API manquante pour {source}")
 
-    response = _client(api_key, base_url).chat.completions.create(
+    response = _client(api_key, base_url, timeout).chat.completions.create(
         model=model,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -166,7 +175,7 @@ def _appeler_llm(
     return IntentionResult.model_validate({**data, "source": source})
 
 
-def _appeler_groq(texte: str) -> IntentionResult:
+def _appeler_groq(texte: str, timeout: float = TIMEOUT_SECONDS) -> IntentionResult:
     settings = get_settings()
     options: dict[str, Any] = {}
     if settings.llm_reasoning_effort:
@@ -178,10 +187,11 @@ def _appeler_groq(texte: str) -> IntentionResult:
         model=settings.openai_model,
         source="groq",
         extra_options=options,
+        timeout=timeout,
     )
 
 
-def _appeler_gemini(texte: str) -> IntentionResult:
+def _appeler_gemini(texte: str, timeout: float = TIMEOUT_SECONDS) -> IntentionResult:
     settings = get_settings()
     return _appeler_llm(
         texte,
@@ -189,13 +199,36 @@ def _appeler_gemini(texte: str) -> IntentionResult:
         base_url=settings.gemini_base_url,
         model=settings.gemini_model,
         source="gemini",
+        timeout=timeout,
     )
 
 
-def comprendre(texte: str) -> dict:
+def _dans_le_budget(appel, texte: str, echeance: float) -> IntentionResult:
+    """Appel LLM au délai raccourci ; un seul réessai court après un 429."""
+    for essai in range(2):
+        timeout = min(TIMEOUT_SECONDS, restant(echeance))
+        if timeout < TIMEOUT_MIN_S:
+            raise TimeoutError("plus de temps pour le LLM, repli")
+        try:
+            return appel(texte, timeout=timeout)
+        except RateLimitError as exc:
+            if essai == 1:
+                raise
+            reponse = getattr(exc, "response", None)
+            attente = attente_429(getattr(reponse, "headers", None))
+            if not reessai_possible(attente, echeance):
+                raise
+            logger.info("429 sur l'intention, réessai dans %.2f s", attente)
+            time.sleep(attente)
+    raise RuntimeError("inaccessible")
+
+
+def comprendre(texte: str, echeance: float | None = None) -> dict:
     """Retourne l'intention, le produit et le marché, sans aucun prix.
 
     Ordre : Groq → Gemini (si clé) → règles de secours.
+    echeance (time.monotonic) : fin du budget de la question ; passé ce délai,
+    on saute directement aux règles.
     """
     texte = (texte or "").strip()
     if not texte:
@@ -207,15 +240,16 @@ def comprendre(texte: str) -> dict:
             source="regles",
         ).model_dump()
 
+    echeance = echeance if echeance is not None else nouvelle_echeance()
     try:
-        return _appeler_groq(texte).model_dump()
+        return _dans_le_budget(_appeler_groq, texte, echeance).model_dump()
     except _ERREURS_LLM as exc:
         logger.warning("Groq indisponible ou réponse invalide : %s", exc)
 
     settings = get_settings()
     if settings.gemini_api_key:
         try:
-            return _appeler_gemini(texte).model_dump()
+            return _dans_le_budget(_appeler_gemini, texte, echeance).model_dump()
         except _ERREURS_LLM as exc:
             logger.warning("Gemini indisponible ou réponse invalide, repli sur règles : %s", exc)
     else:

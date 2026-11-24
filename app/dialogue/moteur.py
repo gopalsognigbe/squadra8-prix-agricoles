@@ -138,6 +138,9 @@ class Moteur:
         if sess.etat == "CONFIRMER_SAC":
             return self._confirmer_sac(sess, t)
 
+        if sess.etat == "CHOISIR_UNITE":
+            return self._choisir_unite(sess, t)
+
         return self._erreur(sess)
 
     # ---------- touche 3 : question à voix haute ----------
@@ -214,11 +217,30 @@ class Moteur:
             return self._tour(sess, "CONFIRMER_SAC",
                               [self._d(T.phrase_offre_sac(montant)), self._p("O04")],
                               touches=["1", "2"])
+        if montant and unite is None:
+            # Montant compris mais unité non dite : on la demande (jamais supposée).
+            return self._tour(sess, "CHOISIR_UNITE",
+                              [self._d(T.phrase_offre_montant(montant)), self._p("O05")],
+                              touches=["1", "2", "3"])
         sess.voix = None
         sess.montant = ""
         return self._tour(sess, "OFFRE_MONTANT", [self._p("O03"), self._p("O01")],
                           attente="montant", touches=CHIFFRES + ["#"],
                           repetition=[self._p("O01")])
+
+    def _choisir_unite(self, sess, t):
+        montant = (sess.voix or {}).get("montant")
+        if t in ("1", "2") and montant:
+            self._ok(sess)
+            sess.voix = None
+            return self._juger(sess, montant * 100 if t == "1" else montant)
+        if t == "3":
+            self._ok(sess)
+            sess.voix = None
+            sess.montant = ""
+            return self._tour(sess, "OFFRE_MONTANT", [self._p("O01")],
+                              attente="montant", touches=CHIFFRES + ["#"])
+        return self._erreur(sess)
 
     def _confirmer_sac(self, sess, t):
         demande = sess.voix or {}

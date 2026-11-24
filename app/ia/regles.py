@@ -43,6 +43,19 @@ def trouver_produit(texte: str) -> str | None:
     return _trouver(PRODUITS, _normaliser(texte or ""))
 
 
+_MOTS_ARGENT = re.compile(r"\b(?:francs?|f|fcfa|cfa|sacs?|kilos?|kg)\b")
+
+
+def _montant_d_offre(n: str, produit: str | None) -> bool:
+    """Un montant (≥ 10, pas un poids) avec un mot d'argent, d'unité ou un produit → offre.
+
+    Une demande de prix ne contient pas de montant : « quinze mille pour le soja » en contient un.
+    """
+    if montant_en_francs(n) is None:
+        return False
+    return bool(_MOTS_ARGENT.search(n)) or produit is not None
+
+
 def comprendre_par_regles(texte: str) -> dict:
     """Retourne l'intention à partir de mots-clés (secours si Groq échoue)."""
     brut = texte or ""
@@ -70,8 +83,19 @@ def comprendre_par_regles(texte: str) -> dict:
             "accepter",
             "me payer",
             "bon prix",
+            # Ajouts touche 3 (offres classées « prix » au G8 après des 429)
+            "offert",
+            "acheteur",
+            "commercant",
+            "c'est bien",
+            "c est bien",
+            "vends ou pas",
+            "vendre ou pas",
+            "je dois vendre",
+            "dois je vendre",
+            "je vends ?",
         )
-    ):
+    ) or _montant_d_offre(n, produit):
         intention = "juger_offre"
     elif any(m in n for m in ("prix", "coute", "coûte", "combien", "tarif", "cours")):
         intention = "prix"
