@@ -23,7 +23,8 @@ def _est_choix_produit(tour) -> bool:
 
 def _est_reponse_offre(tour) -> bool:
     return any(p.id == "D01" for p in tour.phrases) or any(
-        p.texte.startswith("L'acheteur propose") and p.texte.endswith("le kilo.")
+        p.texte.startswith("L'acheteur propose")
+        and p.texte.endswith(("le kilo.", "le sac de cent kilos."))
         for p in tour.phrases
     )
 
@@ -60,10 +61,11 @@ def _naviguer(moteur, produit_touche: str, action: str, *, montant: str = "", vo
 
 
 def phrases_offre(tour) -> list[str]:
-    """Phrases à partir de « L'acheteur propose … le kilo. » (quel que soit le préfixe)."""
+    """Phrases à partir de « L'acheteur propose … » (au kilo ou au sac de 100 kg)."""
     textes = [p.texte for p in tour.phrases]
     debut = next(i for i, t in enumerate(textes)
-                 if t.startswith("L'acheteur propose") and t.endswith("le kilo."))
+                 if t.startswith("L'acheteur propose")
+                 and t.endswith(("le kilo.", "le sac de cent kilos.")))
     return textes[debut:]
 
 
@@ -119,14 +121,15 @@ def test_prix_le_plus_eleve() -> None:
 
 # ---------- touche 2 ----------
 def test_touche2_trois_marches_annonces() -> None:
-    tour = touche2("1", "13500")  # maïs, 13 500 F les 100 kg
+    tour = touche2("1", "13500")  # maïs, 13 500 F les 100 kg → réponse en sac de 100 kg
     phrases = phrases_offre(tour)
-    assert phrases[0] == "L'acheteur propose cent trente-cinq francs le kilo."
-    assert phrases[1] == ("À Bohicon, le kilo est à cent trente-sept francs, "
-                          "relevé le vingt-cinq octobre : l'offre est proche de ce prix.")
-    assert phrases[2] == ("À Houndjro (Abomey), le kilo est à cent vingt-neuf francs, "
-                          "relevé le dix-neuf octobre : l'offre est au-dessus de ce prix.")
-    assert phrases[3] == ("À Azogotchébou (Covè), le kilo est à cent quarante francs, "
+    assert phrases[0] == "L'acheteur propose treize mille cinq cents francs le sac de cent kilos."
+    assert phrases[1] == ("À Bohicon, le sac de cent kilos est à treize mille sept cent trente-six "
+                          "francs, relevé le vingt-cinq octobre : l'offre est proche de ce prix.")
+    assert phrases[2] == ("À Houndjro (Abomey), le sac de cent kilos est à douze mille huit cent "
+                          "cinquante-sept francs, relevé le dix-neuf octobre : "
+                          "l'offre est au-dessus de ce prix.")
+    assert phrases[3] == ("À Azogotchébou (Covè), le sac de cent kilos est à quatorze mille francs, "
                           "relevé le vingt-huit octobre : l'offre est proche de ce prix.")
     assert phrases[4] == "Le prix de détail le plus élevé est à Azogotchébou (Covè)."
     assert len(phrases) >= 5 and tour.etat == "MENU_PRINCIPAL"
@@ -136,7 +139,7 @@ def test_touche2_trois_marches_annonces() -> None:
 def test_touche2_marches_sans_prix_signales() -> None:
     tour = touche2("2", "35000")  # soja : seul Bohicon a un prix
     t = texte(tour)
-    assert "À Bohicon, le kilo est à quatre cent sept francs" in t
+    assert "À Bohicon, le sac de cent kilos est à quarante mille sept cents francs" in t
     assert "l'offre est en dessous de ce prix" in t
     assert "À Houndjro (Abomey), il n'y a pas de prix récent pour ce produit." in t
     assert "À Azogotchébou (Covè), il n'y a pas de prix récent pour ce produit." in t

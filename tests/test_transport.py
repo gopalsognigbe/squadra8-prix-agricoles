@@ -104,7 +104,7 @@ def test_touche2_commune_demandee_puis_net_annonce():
     assert set(demande.touches_valides) == set("0123456789")
     rep = texte(tours[-1])
     assert sess.commune == "Zagnanado"
-    assert "Le transport depuis Zagnanado coûte environ huit francs le kilo, c'est une estimation." in rep
+    assert "Le transport depuis Zagnanado coûte environ huit cents francs le sac, c'est une estimation." in rep
     assert "Il vous resterait" in rep and "relevé le" in rep
     assert "prix du jour" not in rep
 
@@ -142,7 +142,7 @@ def test_statut_verifie_ne_dit_plus_estimation(csv_temporaire):
     moteur = Moteur(services_reels(), voix_active=False)
     _, tours = _offre_touche2(moteur, commune="7")
     rep = texte(tours[-1])
-    assert "Le transport depuis Zagnanado coûte environ huit francs le kilo." in rep
+    assert "Le transport depuis Zagnanado coûte environ huit cents francs le sac." in rep
     assert "estimation" not in rep
 
 

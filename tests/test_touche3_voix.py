@@ -145,7 +145,7 @@ def test_offre_au_kilo_jugee_au_marche_dit() -> None:
 def test_offre_sac_de_cent_kilos_directe() -> None:
     jouer, _, _ = appel_voix(compris("juger_offre", variete="blanc", montant=12000, unite="100kg"))
     t = texte(jouer("VOIX", "q.wav"))
-    assert "cent vingt francs le kilo" in t and "Bohicon" in t and "en dessous" in t
+    assert "douze mille francs le sac de cent kilos" in t and "Bohicon" in t and "en dessous" in t
 
 
 def test_offre_sac_poids_non_dit_on_demande() -> None:
@@ -154,7 +154,7 @@ def test_offre_sac_poids_non_dit_on_demande() -> None:
     assert tour.etat == "CONFIRMER_SAC"
     assert "quinze mille francs le sac" in texte(tour) and "100 kilos, tapez 1" in texte(tour)
     t = texte(jouer("TOUCHE", "1"))
-    assert "cent cinquante francs le kilo" in t and "au-dessus" in t
+    assert "quinze mille francs le sac de cent kilos" in t and "au-dessus" in t
 
 
 def test_offre_sac_autre_poids_on_tape_le_prix_pour_100_kilos() -> None:
@@ -435,7 +435,7 @@ def test_parcours_complet_abome_quinze_mille_le_sac(monkeypatch) -> None:
     tour = jouer("VOIX", "texte:à Abomé on me propose quinze mille francs le sac de maïs jaune")
     assert tour.etat == "CONFIRMER_SAC" and "quinze mille francs le sac" in texte(tour)
     t = texte(jouer("TOUCHE", "1"))
-    assert "cent cinquante francs le kilo" in t and "Houndjro (Abomey)" in t
+    assert "quinze mille francs le sac de cent kilos" in t and "Houndjro (Abomey)" in t
     verifier_regles_annonce(t)
 
 

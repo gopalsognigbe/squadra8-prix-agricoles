@@ -68,6 +68,8 @@ class Session:
     # Commune de départ (transport) : None = pas encore demandée ; "autre" = hors liste.
     commune: str | None = None
     offre_en_attente: int | None = None
+    # Unité dans laquelle l'offre a été dite : "sac" (100 kg) ou "kg".
+    unite_offre: str | None = None
 
 
 class Moteur:
@@ -114,25 +116,21 @@ class Moteur:
                 if action == "offre":
                     sess.montant = ""
                     sess.marche_offre = None
+                    sess.unite_offre = "sac"  # O01 : prix d'un sac de 100 kilos
                     return self._tour(sess, "OFFRE_MONTANT", [self._p("O01")],
                                       attente="montant", touches=CHIFFRES + ["#"])
                 return self._menu(sess)
             return self._erreur(sess)
 
         if sess.etat == "MENU_PRINCIPAL":
+            # 1 et 2 : le produit est toujours demandé, comme au décroché
+            # (l'appelant peut changer de produit ; le menu annoncé reste vrai).
             if t == "1":
                 self._ok(sess)
-                if not sess.produit:
-                    return self._demander_produit(sess, "prix")
-                return self._prix(sess)
+                return self._demander_produit(sess, "prix")
             if t == "2":
                 self._ok(sess)
-                if not sess.produit:
-                    return self._demander_produit(sess, "offre")
-                sess.montant = ""
-                sess.marche_offre = None
-                return self._tour(sess, "OFFRE_MONTANT", [self._p("O01")],
-                                  attente="montant", touches=CHIFFRES + ["#"])
+                return self._demander_produit(sess, "offre")
             if t == "3":
                 self._ok(sess)
                 if not self._voix_prete:
@@ -233,9 +231,11 @@ class Moteur:
         montant, unite = demande.get("montant"), demande.get("unite")
         if montant and unite == "kg":
             sess.voix = None
+            sess.unite_offre = "kg"
             return self._juger(sess, montant * 100)
         if montant and unite == "100kg":
             sess.voix = None
+            sess.unite_offre = "sac"
             return self._juger(sess, montant)
         if montant and unite == "sac":
             # Poids du sac non dit : on demande, on ne suppose pas 100 kilos.
@@ -258,6 +258,7 @@ class Moteur:
         if t in ("1", "2") and montant:
             self._ok(sess)
             sess.voix = None
+            sess.unite_offre = "kg" if t == "1" else "sac"
             return self._juger(sess, montant * 100 if t == "1" else montant)
         if t == "3":
             self._ok(sess)
@@ -272,6 +273,7 @@ class Moteur:
         if t == "1" and demande.get("montant"):
             self._ok(sess)
             sess.voix = None
+            sess.unite_offre = "sac"
             return self._juger(sess, demande["montant"])
         if t == "2":
             self._ok(sess)
@@ -288,8 +290,7 @@ class Moteur:
                           touches=["1", "2", "3"], repetition=[self._p("P00")])
 
     def _menu(self, sess, prefixe=None):
-        menu = [self._p("M01"), self._p("M02"),
-                self._p("M03" if self._voix_prete else "M03B"), self._p("M04")]
+        menu = self._phrases_menu()
         tour = self._tour(sess, "MENU_PRINCIPAL", (prefixe or []) + menu,
                           touches=["1", "2", "3", "4"], repetition=menu)
         sess.dernier_tour = tour
@@ -298,7 +299,7 @@ class Moteur:
     def _prix(self, sess, marche=None):
         liste = self.services.prix(sess.produit)
         if not liste:
-            return self._reponse(sess, [self._p("D01"), self._p("R01")])
+            return self._reponse(sess, [self._p("D01")])
         phrases = [self._d(T.phrase_entete_prix(sess.produit))]
         if marche is not None:
             # Touche 3 : marché précisé. Sans prix récent là-bas, on le dit
@@ -313,7 +314,6 @@ class Moteur:
         if not sess.avertissement_dit:
             phrases += [self._p("AV01"), self._p("AV02")]
             sess.avertissement_dit = True
-        phrases.append(self._p("R01"))
         return self._reponse(sess, phrases)
 
     def _montant(self, sess, t):
@@ -348,8 +348,10 @@ class Moteur:
         offre = self.services.offre(sess.produit, montant_sac, **options)
         sess.marche_offre = None
         if offre is None:
-            return self._reponse(sess, [self._p("D01"), self._p("R01")])
-        phrases = [self._d(x) for x in T.phrases_offre(offre)] + [self._p("R01")]
+            return self._reponse(sess, [self._p("D01")])
+        unite = sess.unite_offre or "sac"
+        sess.unite_offre = None
+        phrases = [self._d(x) for x in T.phrases_offre(offre, unite=unite)]
         return self._reponse(sess, phrases)
 
     def _choisir_commune(self, sess, t):
@@ -402,9 +404,15 @@ class Moteur:
         sess.nb_silences = 0
 
     # ---------- outils ----------
+    def _phrases_menu(self):
+        return [self._p("M01"), self._p("M02"),
+                self._p("M03" if self._voix_prete else "M03B"), self._p("M04")]
+
     def _reponse(self, sess, phrases):
-        tour = self._tour(sess, "MENU_PRINCIPAL", phrases, touches=["1", "2", "3", "4"],
-                          repetition=[self._p("R01")])
+        """Réponse puis le menu complet (mêmes phrases qu'au décroché)."""
+        menu = self._phrases_menu()
+        tour = self._tour(sess, "MENU_PRINCIPAL", phrases + menu, touches=["1", "2", "3", "4"],
+                          repetition=menu)
         sess.dernier_tour = tour
         return tour
 

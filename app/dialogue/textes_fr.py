@@ -20,7 +20,6 @@ TEXTES = {
     "M03": "Pour poser votre question à voix haute, tapez 3.",
     "M03B": "Pour poser votre question à voix haute, tapez 3 : bientôt disponible.",
     "M04": "Pour réécouter, tapez 4.",
-    "R01": "Pour une autre information, tapez 1, 2 ou 3. Pour réécouter, tapez 4.",
     "V05": "Cette fonction arrive bientôt.",
     # Ajoutées pour le moteur
     "AV01": "Ce prix est un repère, pas une garantie.",
@@ -100,9 +99,22 @@ _VERDICTS_MARCHE = {
 }
 
 
-def phrase_offre_kilo(offre_kg: float) -> str:
-    offre = arrondir_au_franc(offre_kg)
-    return f"L'acheteur propose {en_lettres(offre)} {francs(offre)} le kilo."
+# Unité de la réponse = unité de l'offre : "kg" (franc par kilo) ou "sac" (sac de 100 kg).
+_UNITES = {"kg": ("le kilo", "le kilo"), "sac": ("le sac de cent kilos", "le sac")}
+
+
+def _en_unite(valeur_kg: float, unite: str) -> int:
+    """Montant annoncé, arrondi au franc : au kilo, ou ×100 pour un sac de 100 kg."""
+    return arrondir_au_franc(valeur_kg * 100 if unite == "sac" else valeur_kg)
+
+
+def _f(n: int) -> str:
+    return f"{en_lettres(n)} {francs(n)}"
+
+
+def phrase_offre_kilo(offre_kg: float, unite: str = "kg") -> str:
+    offre = _en_unite(offre_kg, unite)
+    return f"L'acheteur propose {_f(offre)} {_UNITES[unite][0]}."
 
 
 _VERDICTS_NET = {
@@ -112,45 +124,51 @@ _VERDICTS_NET = {
 }
 
 
-def phrase_offre_marche_transport(c: dict, commune: str) -> str:
+def phrase_offre_marche_transport(c: dict, commune: str, unite: str = "kg") -> str:
     """Prix de détail, date, transport depuis la commune, net et verdict sur le net."""
-    ref = arrondir_au_franc(c["reference_kg"])
-    cout = arrondir_au_franc(c["transport_kg"])
-    net = arrondir_au_franc(c["net_kg"])
+    ref = _en_unite(c["reference_kg"], unite)
+    cout = _en_unite(c["transport_kg"], unite)
+    net = _en_unite(c["net_kg"], unite)
     estime = c.get("statut_transport") != "verifie"
     transport = (
-        f"Le transport depuis {commune} coûte environ {en_lettres(cout)} {francs(cout)} le kilo"
+        f"Le transport depuis {commune} coûte environ {_f(cout)} {_UNITES[unite][1]}"
         + (", c'est une estimation" if estime else "")
     )
     verdict = _VERDICTS_NET.get(c.get("verdict"), "l'offre a été comparée à ce montant")
     return (
-        f"À {c['marche']}, le kilo est à {en_lettres(ref)} {francs(ref)}, "
+        f"À {c['marche']}, {_UNITES[unite][0]} est à {_f(ref)}, "
         f"relevé le {date_en_lettres(c['date_releve'])}. {transport}. "
-        f"Il vous resterait {en_lettres(net)} {francs(net)} : {verdict}."
+        f"Il vous resterait {_f(net)} : {verdict}."
     )
 
 
-def phrase_offre_marche(c: dict, commune: str | None = None) -> str:
+def phrase_offre_marche(c: dict, commune: str | None = None, unite: str = "kg") -> str:
     """Une phrase par marché : prix de détail, date du relevé, verdict."""
     if c.get("reference_kg") is None:
         return f"À {c['marche']}, il n'y a pas de prix récent pour ce produit."
-    ref = arrondir_au_franc(c["reference_kg"])
     if c.get("net_kg") is not None and commune:
-        return phrase_offre_marche_transport(c, commune)
+        return phrase_offre_marche_transport(c, commune, unite)
+    ref = _en_unite(c["reference_kg"], unite)
     verdict = _VERDICTS_MARCHE.get(c.get("verdict"), "l'offre a été comparée à ce prix")
     return (
-        f"À {c['marche']}, le kilo est à {en_lettres(ref)} {francs(ref)}, "
+        f"À {c['marche']}, {_UNITES[unite][0]} est à {_f(ref)}, "
         f"relevé le {date_en_lettres(c['date_releve'])} : {verdict}."
     )
 
 
-def phrases_offre(o: dict) -> list[str]:
-    """Annonce l'offre comparée au prix de détail de chaque marché (date du relevé)."""
+def phrases_offre(o: dict, unite: str = "kg") -> list[str]:
+    """Annonce l'offre comparée au prix de détail de chaque marché (date du relevé).
+
+    ``unite`` : "kg" (réponse au kilo) ou "sac" (réponse par sac de 100 kilos),
+    la même unité que l'offre. Le verdict, lui, ne dépend pas de l'unité.
+    """
+    if unite not in _UNITES:
+        unite = "kg"
     marches = o.get("marches")
     if marches:
-        phrases = [phrase_offre_kilo(o["offre_kg"])]
+        phrases = [phrase_offre_kilo(o["offre_kg"], unite)]
         commune = o.get("commune")
-        phrases += [phrase_offre_marche(c, commune) for c in marches]
+        phrases += [phrase_offre_marche(c, commune, unite) for c in marches]
         meilleur_net = marche_net_le_plus_eleve(marches) if commune else None
         meilleur = marche_prix_le_plus_eleve(marches)
         if meilleur_net:
@@ -171,11 +189,11 @@ def phrases_offre(o: dict) -> list[str]:
     else:
         jugement = "L'offre a été comparée au prix de détail."
 
-    ref = arrondir_au_franc(o["reference_kg"])
+    ref = _en_unite(o["reference_kg"], unite)
     return [
-        phrase_offre_kilo(o["offre_kg"]),
+        phrase_offre_kilo(o["offre_kg"], unite),
         (
-            f"Au détail, le kilo est à {en_lettres(ref)} {francs(ref)} "
+            f"Au détail, {_UNITES[unite][0]} est à {_f(ref)} "
             f"à {o['marche']}, relevé le {date_en_lettres(o['date_releve'])}."
         ),
         jugement,

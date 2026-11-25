@@ -74,8 +74,10 @@ def test_quinze_mille_le_sac_de_100_kilos(monkeypatch) -> None:
     jouer = appel_regles(monkeypatch)
     jouer("VOIX", QUINZE_MILLE)
     t = texte(jouer("TOUCHE", "2"))
-    assert "cent cinquante francs le kilo" in t and "Bohicon" in t and "relevé le" in t
-    assert "en dessous" in t  # soja de test : 407 F le kilo
+    # « 100 kilos » confirmé → réponse en sac de 100 kg.
+    assert "quinze mille francs le sac de cent kilos" in t and "Bohicon" in t and "relevé le" in t
+    assert "le kilo" not in t
+    assert "en dessous" in t  # soja de test : 407 F le kilo, soit 40 700 F le sac
 
 
 def test_quinze_mille_le_kilo(monkeypatch) -> None:

@@ -26,16 +26,21 @@ def nouvel_appel(**kw):
 
 
 def au_menu(**kw):
-    """Décroche au menu principal, produit = maïs (sans annoncer les prix)."""
+    """Décroche au menu principal ; quand le produit est demandé, on choisit le maïs."""
     fakes_kw = kw.pop("fakes", {})
     moteur = Moteur(services_fakes(**fakes_kw), **kw)
     sess = moteur.nouvelle_session("test")
 
-    def jouer(type_: str, valeur: str | None = None):
+    def brut(type_: str, valeur: str | None = None):
         return moteur.traiter(sess, Evenement(type=type_, valeur=valeur))
 
-    jouer("DECROCHE")
-    sess.produit = "mais"
+    def jouer(type_: str, valeur: str | None = None):
+        tour = brut(type_, valeur)
+        if tour.etat == "CHOIX_PRODUIT":  # touches 1 et 2 : le produit est demandé
+            tour = brut("TOUCHE", "1")  # maïs
+        return tour
+
+    brut("DECROCHE")
     return jouer
 
 
@@ -126,7 +131,9 @@ def test_offre_douze_mille_en_dessous() -> None:
     tour = jouer("TOUCHE", "#")
     t = texte(tour)
     assert tour.etat == "MENU_PRINCIPAL"
-    assert "cent vingt" in t and "cent trente-sept" in t
+    # Touche 2 : l'offre est tapée pour un sac de 100 kg → réponse en sac.
+    assert "douze mille francs le sac de cent kilos" in t
+    assert "treize mille sept cent trente-six francs" in t
     assert "en dessous" in t
     assert "vingt-cinq octobre" in t
     assert "aujourd'hui" not in t.casefold()
