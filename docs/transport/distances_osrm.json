@@ -1,0 +1,83 @@
+{
+ "communes": {
+  "Abomey": [
+   7.18527778,
+   1.99138889
+  ],
+  "Agbangnizoun": [
+   7.066667,
+   1.966667
+  ],
+  "Bohicon": [
+   7.183333,
+   2.066667
+  ],
+  "Covè": [
+   7.222222,
+   2.338889
+  ],
+  "Djidja": [
+   7.344444,
+   1.933333
+  ],
+  "Ouinhi": [
+   7.083319,
+   2.483361
+  ],
+  "Zagnanado": [
+   7.266667,
+   2.35
+  ],
+  "Za-Kpota": [
+   7.230278,
+   2.215278
+  ],
+  "Zogbodomey": [
+   7.083333,
+   2.1
+  ]
+ },
+ "marches": {
+  "Bohicon": [
+   7.183333,
+   2.066667
+  ],
+  "Houndjro (Abomey)": [
+   7.1807737,
+   1.9917124
+  ],
+  "Azogotchébou (Covè)": [
+   7.2191056,
+   2.3401851
+  ]
+ },
+ "distances_km": {
+  "Abomey|Bohicon": 15.3,
+  "Abomey|Houndjro (Abomey)": 0.8,
+  "Abomey|Azogotchébou (Covè)": 44.3,
+  "Agbangnizoun|Bohicon": 23.2,
+  "Agbangnizoun|Houndjro (Abomey)": 13.3,
+  "Agbangnizoun|Azogotchébou (Covè)": 52.2,
+  "Bohicon|Bohicon": 0.0,
+  "Bohicon|Houndjro (Abomey)": 12.9,
+  "Bohicon|Azogotchébou (Covè)": 34.8,
+  "Covè|Bohicon": 35.1,
+  "Covè|Houndjro (Abomey)": 43.9,
+  "Covè|Azogotchébou (Covè)": 0.5,
+  "Djidja|Bohicon": 25.1,
+  "Djidja|Houndjro (Abomey)": 23.2,
+  "Djidja|Azogotchébou (Covè)": 59.6,
+  "Ouinhi|Bohicon": 74.9,
+  "Ouinhi|Houndjro (Abomey)": 83.7,
+  "Ouinhi|Azogotchébou (Covè)": 40.2,
+  "Zagnanado|Bohicon": 40.8,
+  "Zagnanado|Houndjro (Abomey)": 49.6,
+  "Zagnanado|Azogotchébou (Covè)": 5.5,
+  "Za-Kpota|Bohicon": 21.1,
+  "Za-Kpota|Houndjro (Abomey)": 30.0,
+  "Za-Kpota|Azogotchébou (Covè)": 16.7,
+  "Zogbodomey|Bohicon": 12.4,
+  "Zogbodomey|Houndjro (Abomey)": 21.2,
+  "Zogbodomey|Azogotchébou (Covè)": 41.4
+ }
+}
