@@ -25,7 +25,10 @@ const etat = {
 /* ---------- affichage ---------- */
 function montrer(vue) {
   for (const v of ["vue-bip", "vue-sonnerie", "vue-appel"]) $(v).classList.toggle("cache", v !== vue);
-  $("commandes").classList.toggle("cache", vue !== "vue-appel");
+  // Clavier Nokia toujours visible ; les touches ne servent qu'en appel.
+  $("commandes").classList.remove("cache");
+  const tel = document.querySelector(".telephone");
+  if (tel) tel.dataset.vue = vue;
 }
 function statut(texte) { $("statut").textContent = texte; }
 function erreur(message) {
@@ -344,7 +347,8 @@ async function basculerMicro() {
   const max = Math.max(2, (etat.tour?.delai_s || 12) - 0.5);
   const debut = Date.now();
   $("micro").classList.add("enregistre");
-  $("micro").textContent = "⏹ Arrêter et envoyer";
+  $("micro").textContent = "⏹";
+  $("micro").title = "Arrêter et envoyer";
   statut("Enregistrement…");
   etat.finEnregistrement = setInterval(() => {
     const ecoule = (Date.now() - debut) / 1000;
@@ -357,7 +361,8 @@ function arreterEnregistrement(annuler) {
   clearInterval(etat.finEnregistrement);
   $("minuteur").textContent = "";
   $("micro").classList.remove("enregistre");
-  $("micro").textContent = "🎤 Parler";
+  $("micro").textContent = "🎤";
+  $("micro").title = "Parler";
   const rec = etat.enregistreur;
   etat.enregistreur = null;
   if (rec) {

@@ -1,12 +1,26 @@
-/* Styles du simulateur (faux téléphone). Aucun framework, aucun CDN. */
+/* Simulateur : faux Nokia à touches (pas un smartphone). Aucun framework, aucun CDN. */
 :root {
-  --vert: #1f8a4c; --vert-clair: #e7f5ec; --rouge: #d64040; --or: #e0a526;
-  --encre: #1d2a22; --gris: #6b7a70; --fond: #f4f1e8; --carte: #ffffff;
+  --vert: #1f8a4c;
+  --vert-clair: #d8f0e0;
+  --rouge: #c62828;
+  --or: #e0a526;
+  --encre: #1a2a20;
+  --gris: #5a6b60;
+  --lcd: #9eb896;
+  --lcd-texte: #0f2414;
+  --coque: #3d4a55;
+  --coque-clair: #5a6a78;
+  --touche: #2a333c;
+  --touche-bord: #1a2228;
 }
 * { box-sizing: border-box; }
 body {
-  margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  color: var(--encre); background: linear-gradient(160deg, #f8f4e6 0%, #e9f1e4 100%);
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--encre);
+  background:
+    radial-gradient(ellipse at 30% 0%, #e8f5ec 0%, transparent 50%),
+    linear-gradient(165deg, #f3efe4 0%, #dde8d8 100%);
   min-height: 100vh;
 }
 .entete {
@@ -25,95 +39,207 @@ body {
   display: flex; gap: 2rem; justify-content: center; align-items: flex-start;
   padding: 1.5rem 1rem 3rem; flex-wrap: wrap;
 }
-.telephone {
-  width: 360px; max-width: 100%; background: #16201a; border-radius: 42px;
-  padding: 18px 14px 22px; box-shadow: 0 20px 50px rgba(0,0,0,.25);
-}
-.haut-parleur { width: 70px; height: 6px; border-radius: 3px; background: #3a463e; margin: 0 auto 12px; }
-.ecran {
-  background: var(--carte); border-radius: 26px; min-height: 360px; padding: 14px;
-  display: flex; flex-direction: column; position: relative;
-}
-.barre { display: flex; justify-content: space-between; font-size: .8rem; color: var(--gris); margin-bottom: 8px; }
-.statut { font-weight: 600; color: var(--vert); }
-.vue { flex: 1; display: flex; flex-direction: column; }
-.cache { display: none !important; }
-.consigne { margin: .3rem 0 1rem; line-height: 1.4; }
-.etiquette { font-size: .85rem; color: var(--gris); }
-input[type=tel] {
-  font-size: 1.3rem; padding: .6rem .7rem; border: 2px solid #cfd8d2; border-radius: 12px;
-  margin: .3rem 0 .2rem; width: 100%;
-}
-input[type=tel]:focus { outline: none; border-color: var(--vert); }
-.aide { color: var(--gris); font-size: .78rem; margin-bottom: 1rem; }
-.bouton {
-  border: 0; border-radius: 14px; padding: .8rem 1rem; font-size: 1.05rem; cursor: pointer;
-  font-weight: 600;
-}
-.bouton:disabled { opacity: .45; cursor: not-allowed; }
-.principal { background: var(--vert); color: #fff; margin-top: auto; }
-.rond { width: 64px; height: 64px; border-radius: 50%; font-size: 1.6rem; padding: 0; color: #fff; }
-.vert { background: var(--vert); }
-.rouge { background: var(--rouge); }
-#raccrocher { transform: rotate(135deg); }
-.ligne-boutons { display: flex; justify-content: space-around; align-items: center; gap: 1rem; margin-top: 14px; }
 
-.appelant { text-align: center; margin: 1.5rem 0; flex: 1; }
-.avatar {
-  width: 96px; height: 96px; border-radius: 50%; background: var(--vert-clair);
-  margin: 0 auto 1rem; display: grid; place-items: center; font-size: 3rem;
+/* ----- Coque Nokia ----- */
+.telephone.nokia {
+  width: 300px; max-width: 100%;
+  display: flex; flex-direction: column; align-items: center;
 }
-.avatar.sonne { animation: sonne 1s infinite; }
-@keyframes sonne {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(31,138,76,.45); transform: rotate(0); }
-  10% { transform: rotate(-8deg); } 20% { transform: rotate(8deg); } 30% { transform: rotate(0); }
-  70% { box-shadow: 0 0 0 22px rgba(31,138,76,0); }
+.antenne {
+  width: 10px; height: 36px; margin-bottom: -4px;
+  background: linear-gradient(90deg, #6a7884, #9aa6b0 40%, #6a7884);
+  border-radius: 4px 4px 0 0;
+  box-shadow: inset -2px 0 0 rgba(0,0,0,.2);
 }
-.nom { font-weight: 700; font-size: 1.1rem; margin: 0; }
-.sous-titre { color: var(--gris); margin: .3rem 0 0; }
+.coque {
+  width: 100%;
+  background: linear-gradient(145deg, var(--coque-clair) 0%, var(--coque) 45%, #2c3640 100%);
+  border-radius: 28px 28px 36px 36px;
+  padding: 14px 16px 20px;
+  box-shadow:
+    0 18px 40px rgba(0,0,0,.35),
+    inset 0 1px 0 rgba(255,255,255,.25),
+    inset 0 -2px 6px rgba(0,0,0,.35);
+  border: 2px solid #1e262e;
+}
+.marque {
+  text-align: center; color: #dce3e9; font-size: .75rem; letter-spacing: .35em;
+  font-weight: 700; margin: 2px 0 8px; text-shadow: 0 1px 0 rgba(0,0,0,.4);
+}
+.haut-parleur {
+  width: 52px; height: 5px; border-radius: 3px; background: #1a2228;
+  margin: 0 auto 10px; box-shadow: inset 0 1px 2px rgba(0,0,0,.6);
+}
+
+/* ----- Écran LCD ----- */
+.ecran {
+  background: linear-gradient(180deg, #b8cfa8 0%, var(--lcd) 100%);
+  border-radius: 6px;
+  min-height: 220px;
+  max-height: 280px;
+  padding: 8px 10px;
+  display: flex; flex-direction: column;
+  position: relative;
+  color: var(--lcd-texte);
+  border: 3px solid #1a2228;
+  box-shadow:
+    inset 0 0 12px rgba(20,40,20,.25),
+    0 0 0 2px #6a7884;
+  font-family: "Lucida Console", "Courier New", ui-monospace, monospace;
+  overflow: hidden;
+}
+.barre {
+  display: flex; justify-content: space-between; font-size: .8rem;
+  color: var(--lcd-texte); margin-bottom: 4px; opacity: .9;
+  border-bottom: 1px solid rgba(15,36,20,.25); padding-bottom: 3px;
+}
+.statut { font-weight: 700; }
+.vue { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.cache { display: none !important; }
+.consigne { margin: .2rem 0 .6rem; line-height: 1.35; font-size: .88rem; }
+.etiquette { font-size: .8rem; opacity: .9; }
+input[type=tel] {
+  font-size: 1rem; padding: .35rem .4rem; border: 1px solid rgba(15,36,20,.35);
+  border-radius: 2px; margin: .2rem 0 .15rem; width: 100%;
+  background: rgba(255,255,255,.35); color: var(--lcd-texte);
+  font-family: inherit;
+}
+input[type=tel]:focus { outline: 1px solid var(--lcd-texte); }
+.aide { font-size: .68rem; opacity: .75; margin-bottom: .6rem; }
+
+.bouton {
+  border: 0; border-radius: 3px; padding: .45rem .6rem; font-size: .85rem; cursor: pointer;
+  font-weight: 700; font-family: inherit;
+}
+.bouton:disabled { opacity: .4; cursor: not-allowed; }
+.principal {
+  background: var(--lcd-texte); color: var(--lcd); margin-top: auto;
+  border-radius: 3px;
+}
+.soft {
+  flex: 1; font-size: .85rem; padding: .45rem .35rem;
+  border-radius: 3px; color: #fff;
+}
+.soft.vert { background: #1b6b3a; }
+.soft.rouge { background: #8b1e1e; }
+.ligne-boutons { display: flex; gap: 8px; margin-top: auto; }
+.softkeys-ecran { margin-top: .6rem; }
+
+.appelant { text-align: center; margin: .6rem 0; flex: 1; }
+.nom { font-weight: 700; font-size: .95rem; margin: 0; }
+.sous-titre { margin: .25rem 0 0; font-size: .78rem; opacity: .85; }
+.icone-appel {
+  font-size: 2rem; margin: .6rem 0 0;
+  animation: sonne-nokia 1s infinite;
+}
+@keyframes sonne-nokia {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(-12deg); }
+  30% { transform: rotate(12deg); }
+  45% { transform: rotate(0); }
+}
 
 .fil {
-  list-style: none; margin: 0; padding: 0; flex: 1; overflow-y: auto; max-height: 380px;
-  display: flex; flex-direction: column; gap: 8px;
+  list-style: none; margin: 0; padding: 0; flex: 1; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 5px; min-height: 0;
 }
-.fil li { max-width: 88%; padding: .55rem .7rem; border-radius: 14px; line-height: 1.35; font-size: .93rem; }
-.fil .service { background: var(--vert-clair); align-self: flex-start; border-bottom-left-radius: 4px; }
-.fil .service.en-cours { outline: 2px solid var(--vert); }
-.fil .paysan { background: #fff3d6; align-self: flex-end; border-bottom-right-radius: 4px; }
+.fil li {
+  max-width: 100%; padding: .3rem .4rem; line-height: 1.3; font-size: .78rem;
+  border-bottom: 1px dotted rgba(15,36,20,.3);
+}
+.fil .service { background: rgba(15,36,20,.08); }
+.fil .service.en-cours { outline: 1px solid var(--lcd-texte); }
+.fil .paysan { background: rgba(255,255,255,.25); text-align: right; }
 .fil .code {
-  display: inline-block; font-family: ui-monospace, Menlo, monospace; font-size: .72rem;
-  background: #fff; border: 1px solid #cfe3d6; border-radius: 6px; padding: 0 .3rem; margin-right: .35rem;
-  color: var(--vert);
+  display: inline-block; font-size: .65rem; border: 1px solid rgba(15,36,20,.35);
+  padding: 0 .2rem; margin-right: .25rem;
 }
-.fil .source { display: block; font-size: .7rem; color: var(--gris); margin-top: .2rem; }
+.fil .source { display: block; font-size: .62rem; opacity: .7; margin-top: .1rem; }
 .attente {
-  margin-top: 10px; padding: .5rem .7rem; border-radius: 10px; background: #f1f4f2;
-  font-size: .85rem; color: var(--encre);
+  margin-top: 6px; padding: .35rem .45rem; font-size: .75rem;
+  border-top: 1px solid rgba(15,36,20,.3); background: rgba(15,36,20,.06);
 }
-.attente b { color: var(--vert); }
-.compris { margin-top: 8px; font-size: .8rem; background: #fffaf0; border: 1px dashed var(--or); border-radius: 10px; padding: .45rem .6rem; }
+.attente b { font-weight: 700; }
+.compris {
+  margin-top: 4px; font-size: .7rem; padding: .3rem .4rem;
+  border: 1px dashed rgba(15,36,20,.4);
+}
 .erreur {
-  margin-top: 10px; background: #fdecec; color: #8d1f1f; border: 1px solid #f1b5b5;
-  border-radius: 10px; padding: .55rem .7rem; font-size: .88rem;
+  margin-top: 6px; background: rgba(140,30,30,.15); color: #5a1010;
+  border: 1px solid rgba(140,30,30,.35); padding: .35rem .45rem; font-size: .75rem;
 }
 
-.commandes { margin-top: 14px; }
-.clavier { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.clavier button {
-  height: 58px; border-radius: 18px; border: 0; background: #2b372f; color: #fff;
-  font-size: 1.45rem; cursor: pointer; display: flex; flex-direction: column; align-items: center;
-  justify-content: center; line-height: 1; transition: background .15s;
+/* ----- Softkeys / navigation physique ----- */
+.nav-physique {
+  display: grid; grid-template-columns: 1fr 52px 1fr; gap: 8px;
+  align-items: center; margin: 12px 0 10px; padding: 0 4px;
 }
-.clavier button small { font-size: .55rem; letter-spacing: .08em; opacity: .6; margin-top: 2px; }
-.clavier button.valide { background: var(--vert); box-shadow: 0 0 0 2px #7fd3a2 inset; }
-.clavier button:active { transform: scale(.96); }
-.micro { background: var(--or); color: #2b1d00; flex: 1; }
-.micro.enregistre { background: var(--rouge); color: #fff; animation: pulse 1s infinite; }
+.soft-gauche, .soft-droite {
+  height: 14px; border-radius: 3px;
+  background: linear-gradient(180deg, #7a8794, #3a4550);
+  box-shadow: 0 2px 0 #1a2228, inset 0 1px 0 rgba(255,255,255,.2);
+}
+.nav-rond {
+  width: 52px; height: 52px; border-radius: 50%; margin: 0 auto;
+  background: radial-gradient(circle at 35% 30%, #6a7884, #2a333c 70%);
+  border: 3px solid #1a2228;
+  box-shadow: inset 0 2px 4px rgba(255,255,255,.15), 0 3px 0 #151b20;
+}
+
+/* ----- Clavier physique (toujours visible) ----- */
+.commandes { margin-top: 2px; }
+.touches-appel {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;
+}
+.bouton-physique {
+  height: 36px; border-radius: 8px; border: 0; cursor: pointer;
+  font-size: 1.1rem; font-weight: 700;
+  box-shadow: 0 3px 0 var(--touche-bord), inset 0 1px 0 rgba(255,255,255,.15);
+}
+.bouton-physique:disabled { opacity: .35; cursor: not-allowed; }
+.bouton-physique.rouge {
+  background: linear-gradient(180deg, #e05a5a, var(--rouge));
+  color: #fff; transform: rotate(135deg);
+}
+.bouton-physique.micro {
+  background: linear-gradient(180deg, #f0c04a, var(--or));
+  color: #2b1d00;
+}
+.bouton-physique.micro.enregistre {
+  background: linear-gradient(180deg, #e05a5a, var(--rouge));
+  color: #fff; animation: pulse 1s infinite;
+}
 @keyframes pulse { 50% { opacity: .75; } }
 
+.clavier { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.clavier button {
+  height: 44px; border-radius: 10px; border: 0;
+  background: linear-gradient(180deg, #3e4a55, var(--touche));
+  color: #e8eef2; font-size: 1.25rem; font-weight: 700; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  line-height: 1;
+  box-shadow: 0 3px 0 var(--touche-bord), inset 0 1px 0 rgba(255,255,255,.12);
+  transition: transform .05s, box-shadow .05s;
+}
+.clavier button small {
+  font-size: .5rem; letter-spacing: .06em; opacity: .55; margin-top: 2px; font-weight: 600;
+}
+.clavier button.valide {
+  background: linear-gradient(180deg, #2d9a58, #1f6e3c);
+  box-shadow: 0 3px 0 #0f3d22, inset 0 0 0 1px #7fd3a2;
+}
+.clavier button:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--touche-bord), inset 0 1px 0 rgba(255,255,255,.08);
+}
+.telephone[data-vue="vue-bip"] .clavier button,
+.telephone[data-vue="vue-sonnerie"] .clavier button {
+  opacity: .45;
+}
+
 .aide-demo {
-  max-width: 300px; background: rgba(255,255,255,.75); border-radius: 18px; padding: 1rem 1.2rem;
-  box-shadow: 0 6px 20px rgba(0,0,0,.06);
+  max-width: 300px; background: rgba(255,255,255,.8); border-radius: 18px;
+  padding: 1rem 1.2rem; box-shadow: 0 6px 20px rgba(0,0,0,.06);
 }
 .aide-demo h2 { font-size: 1rem; margin: .4rem 0 .5rem; color: var(--vert); }
 .aide-demo ul { padding-left: 1rem; margin: 0 0 1rem; line-height: 1.7; }
@@ -121,6 +247,6 @@ input[type=tel]:focus { outline: none; border-color: var(--vert); }
 
 @media (max-width: 720px) {
   .scene { padding: .8rem .5rem 2rem; gap: 1rem; }
-  .telephone { border-radius: 28px; padding: 12px 10px 16px; }
+  .telephone.nokia { width: 280px; }
   .aide-demo { max-width: 360px; width: 100%; }
 }
