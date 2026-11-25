@@ -41,8 +41,10 @@ def appel_regles(monkeypatch, produit_touche="2"):
     def jouer(type_, valeur=None):
         return moteur.traiter(sess, Evenement(type=type_, valeur=valeur))
 
+    from app.dialogue import textes_fr as T
+
     jouer("DECROCHE")
-    jouer("TOUCHE", produit_touche)
+    sess.produit = T.TOUCHE_PRODUIT[produit_touche]
     jouer("TOUCHE", "3")
     return jouer
 

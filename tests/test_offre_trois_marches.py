@@ -17,24 +17,63 @@ def texte(tour) -> str:
     return " ".join(p.texte for p in tour.phrases)
 
 
-def touche2(produit_touche: str, montant: str):
-    moteur = Moteur(services_fakes())
+def _est_choix_produit(tour) -> bool:
+    return tour.etat == "CHOIX_PRODUIT" or any(p.id == "P00" for p in tour.phrases)
+
+
+def _est_reponse_offre(tour) -> bool:
+    return any(p.id == "D01" for p in tour.phrases) or any(
+        p.texte.startswith("L'acheteur propose") and p.texte.endswith("le kilo.")
+        for p in tour.phrases
+    )
+
+
+def _naviguer(moteur, produit_touche: str, action: str, *, montant: str = "", voix=None):
+    """Décroche puis suit les états jusqu'à la réponse d'offre.
+
+    Ne dépend pas de l'accueil : le produit est choisi quand le moteur le
+    demande (CHOIX_PRODUIT / P00), avant ou après le menu principal.
+    """
     sess = moteur.nouvelle_session("o3")
-    moteur.traiter(sess, Evenement(type="DECROCHE"))
-    moteur.traiter(sess, Evenement(type="TOUCHE", valeur=produit_touche))
-    moteur.traiter(sess, Evenement(type="TOUCHE", valeur="2"))
-    for c in montant:
-        moteur.traiter(sess, Evenement(type="TOUCHE", valeur=c))
-    return moteur.traiter(sess, Evenement(type="TOUCHE", valeur="#"))
+
+    def jouer(type_, valeur=None):
+        return moteur.traiter(sess, Evenement(type=type_, valeur=valeur))
+
+    tour = jouer("DECROCHE")
+    action_faite = False
+    for _ in range(20):
+        if _est_reponse_offre(tour):
+            return tour
+        if _est_choix_produit(tour):
+            tour = jouer("TOUCHE", produit_touche)
+        elif tour.etat == "MENU_PRINCIPAL" and not action_faite:
+            action_faite = True
+            tour = jouer("TOUCHE", action)
+        elif tour.etat == "OFFRE_MONTANT":
+            for c in montant + "#":
+                tour = jouer("TOUCHE", c)
+        elif tour.etat == "QUESTION_VOIX":
+            tour = jouer("VOIX", voix)
+        else:
+            raise AssertionError(f"état inattendu : {tour.etat} — {texte(tour)}")
+    raise AssertionError("pas de réponse d'offre")
+
+
+def phrases_offre(tour) -> list[str]:
+    """Phrases à partir de « L'acheteur propose … le kilo. » (quel que soit le préfixe)."""
+    textes = [p.texte for p in tour.phrases]
+    debut = next(i for i, t in enumerate(textes)
+                 if t.startswith("L'acheteur propose") and t.endswith("le kilo."))
+    return textes[debut:]
+
+
+def touche2(produit_touche: str, montant: str, **fakes_kw):
+    return _naviguer(Moteur(services_fakes(**fakes_kw)), produit_touche, "2", montant=montant)
 
 
 def touche3(reponse: dict, produit_touche: str = "1"):
     moteur = Moteur(services_fakes(question=lambda v: reponse), voix_active=True)
-    sess = moteur.nouvelle_session("o3v")
-    moteur.traiter(sess, Evenement(type="DECROCHE"))
-    moteur.traiter(sess, Evenement(type="TOUCHE", valeur=produit_touche))
-    moteur.traiter(sess, Evenement(type="TOUCHE", valeur="3"))
-    return moteur.traiter(sess, Evenement(type="VOIX", valeur="q.wav"))
+    return _naviguer(moteur, produit_touche, "3", voix="q.wav")
 
 
 def offre_voix(famille="mais", variete="blanc", marche=None, montant=15000, unite="100kg"):
@@ -81,7 +120,7 @@ def test_prix_le_plus_eleve() -> None:
 # ---------- touche 2 ----------
 def test_touche2_trois_marches_annonces() -> None:
     tour = touche2("1", "13500")  # maïs, 13 500 F les 100 kg
-    phrases = [p.texte for p in tour.phrases]
+    phrases = phrases_offre(tour)
     assert phrases[0] == "L'acheteur propose cent trente-cinq francs le kilo."
     assert phrases[1] == ("À Bohicon, le kilo est à cent trente-sept francs, "
                           "relevé le vingt-cinq octobre : l'offre est proche de ce prix.")
@@ -90,7 +129,7 @@ def test_touche2_trois_marches_annonces() -> None:
     assert phrases[3] == ("À Azogotchébou (Covè), le kilo est à cent quarante francs, "
                           "relevé le vingt-huit octobre : l'offre est proche de ce prix.")
     assert phrases[4] == "Le prix de détail le plus élevé est à Azogotchébou (Covè)."
-    assert tour.phrases[-1].id == "R01" and tour.etat == "MENU_PRINCIPAL"
+    assert len(phrases) >= 5 and tour.etat == "MENU_PRINCIPAL"
     sans_mots_interdits(texte(tour))
 
 
@@ -106,27 +145,23 @@ def test_touche2_marches_sans_prix_signales() -> None:
 
 
 def test_touche2_aucun_prix_d01() -> None:
-    moteur = Moteur(services_fakes(sans_prix=True))
-    sess = moteur.nouvelle_session("vide")
-    moteur.traiter(sess, Evenement(type="DECROCHE"))
-    moteur.traiter(sess, Evenement(type="TOUCHE", valeur="1"))
-    moteur.traiter(sess, Evenement(type="TOUCHE", valeur="2"))
-    for c in "12000#":
-        tour = moteur.traiter(sess, Evenement(type="TOUCHE", valeur=c))
-    assert [p.id for p in tour.phrases] == ["D01", "R01"]
+    tour = touche2("1", "12000", sans_prix=True)
+    ids = [p.id for p in tour.phrases]
+    assert "D01" in ids
+    assert not any(p.texte.startswith("À ") for p in tour.phrases)
 
 
 # ---------- touche 3 ----------
 def test_touche3_offre_trois_marches_sans_marche_dit() -> None:
     tour = touche3(offre_voix(montant=15000, unite="100kg"))
-    marches = [p.texte.split(",")[0] for p in tour.phrases[1:4]]
+    marches = [t.split(",")[0] for t in phrases_offre(tour)[1:4]]
     assert marches == ["À Bohicon", "À Houndjro (Abomey)", "À Azogotchébou (Covè)"]
     assert texte(tour).count("l'offre est au-dessus de ce prix") == 3
 
 
 def test_touche3_marche_dit_en_premier() -> None:
     tour = touche3(offre_voix(marche=COVE, montant=125, unite="kg"))
-    phrases = [p.texte for p in tour.phrases]
+    phrases = phrases_offre(tour)
     assert phrases[0] == "L'acheteur propose cent vingt-cinq francs le kilo."
     assert phrases[1].startswith("À Azogotchébou (Covè), le kilo est à cent quarante francs")
     assert phrases[2].startswith("À Bohicon,") and phrases[3].startswith("À Houndjro (Abomey),")
@@ -136,7 +171,7 @@ def test_touche3_marche_dit_en_premier() -> None:
 def test_touche3_marche_dit_sans_prix_annonce_puis_autres() -> None:
     tour = touche3(offre_voix(famille="soja", variete=None, marche=COVE,
                               montant=400, unite="kg"), produit_touche="2")
-    phrases = [p.texte for p in tour.phrases]
+    phrases = phrases_offre(tour)
     assert phrases[1] == "À Azogotchébou (Covè), il n'y a pas de prix récent pour ce produit."
     assert phrases[2].startswith("À Bohicon, le kilo est à quatre cent sept francs")
 

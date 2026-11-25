@@ -54,7 +54,7 @@ def _appel(phrase, touches_apres):
     moteur = Moteur(_services(offres), voix_active=True)
     sess = moteur.nouvelle_session("test")
     moteur.traiter(sess, Evenement(type="DECROCHE"))
-    moteur.traiter(sess, Evenement(type="TOUCHE", valeur="2"))  # soja (n'importe)
+    sess.produit = "soja"  # secours si l'IA omet le produit
     moteur.traiter(sess, Evenement(type="TOUCHE", valeur="3"))  # question à voix haute
     tours = [moteur.traiter(sess, Evenement(type="VOIX", valeur=PREFIXE_TEXTE + phrase))]
     for t in touches_apres:

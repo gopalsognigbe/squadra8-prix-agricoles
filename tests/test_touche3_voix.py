@@ -22,7 +22,9 @@ def compris(intention="prix", famille="mais", variete=None, marche=None,
 
 
 def appel_voix(reponse, *, voix_active=True, produit_touche="1"):
-    """Décroche, choisit le produit, tape 3. reponse : dict ou callable."""
+    """Décroche (menu), tape 3. produit_touche = secours si l'IA omet le produit."""
+    from app.dialogue import textes_fr as T
+
     question = reponse if callable(reponse) else (lambda v: reponse)
     moteur = Moteur(services_fakes(question=question), voix_active=voix_active)
     sess = moteur.nouvelle_session("t3")
@@ -31,7 +33,7 @@ def appel_voix(reponse, *, voix_active=True, produit_touche="1"):
         return moteur.traiter(sess, Evenement(type=type_, valeur=valeur))
 
     jouer("DECROCHE")
-    jouer("TOUCHE", produit_touche)
+    sess.produit = T.TOUCHE_PRODUIT[produit_touche]
     tour = jouer("TOUCHE", "3")
     return jouer, tour, sess
 
@@ -54,15 +56,13 @@ def test_delai_voix_suit_audio_max_s() -> None:
     moteur = Moteur(services_fakes(question=lambda v: compris()), voix_active=True, delai_voix=12)
     sess = moteur.nouvelle_session("d")
     moteur.traiter(sess, Evenement(type="DECROCHE"))
-    moteur.traiter(sess, Evenement(type="TOUCHE", valeur="1"))
     assert moteur.traiter(sess, Evenement(type="TOUCHE", valeur="3")).delai_s == 12
 
 
 def test_desactivee_reste_bientot_disponible() -> None:
     moteur = Moteur(services_fakes(), voix_active=False)
     sess = moteur.nouvelle_session("x")
-    moteur.traiter(sess, Evenement(type="DECROCHE"))
-    menu = moteur.traiter(sess, Evenement(type="TOUCHE", valeur="1"))
+    menu = moteur.traiter(sess, Evenement(type="DECROCHE"))
     assert "bientôt disponible" in texte(menu)
     tour = moteur.traiter(sess, Evenement(type="TOUCHE", valeur="3"))
     assert "arrive bientôt" in texte(tour) and tour.etat == "MENU_PRINCIPAL"
@@ -74,8 +74,7 @@ def test_sans_ia_branchee_bientot_disponible() -> None:
     services = services_fakes()
     moteur = Moteur(Services(prix=services.prix, offre=services.offre), voix_active=True)
     sess = moteur.nouvelle_session("x")
-    moteur.traiter(sess, Evenement(type="DECROCHE"))
-    assert "bientôt disponible" in texte(moteur.traiter(sess, Evenement(type="TOUCHE", valeur="1")))
+    assert "bientôt disponible" in texte(moteur.traiter(sess, Evenement(type="DECROCHE")))
     assert "arrive bientôt" in texte(moteur.traiter(sess, Evenement(type="TOUCHE", valeur="3")))
 
 

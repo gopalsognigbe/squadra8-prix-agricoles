@@ -84,12 +84,12 @@ def test_appel_complet_avec_le_vrai_moteur():
     appel_id = _bip()["appel_id"]
     t = client.post(f"{BASE}/{appel_id}/decroche").json()
     assert {"etat", "phrases", "attente", "touches_valides", "delai_s", "fin"} <= set(t)
-    assert t["etat"] == "CHOIX_PRODUIT" and t["phrases"]
+    assert t["etat"] == "MENU_PRINCIPAL" and t["phrases"]
     assert {"id", "texte", "audio"} <= set(t["phrases"][0])
     t = client.post(f"{BASE}/{appel_id}/touche", json={"touche": "1"}).json()
-    assert t["etat"] == "MENU_PRINCIPAL"
+    assert t["etat"] == "CHOIX_PRODUIT"  # prix → demande le produit
     t = client.post(f"{BASE}/{appel_id}/touche", json={"touche": "1"}).json()
-    assert t["phrases"]
+    assert t["phrases"]  # maïs → annonce des prix
     assert client.post(f"{BASE}/{appel_id}/raccroche").json() == {"ok": True}
     assert client.post(f"{BASE}/{appel_id}/decroche").status_code == 404
 
@@ -193,7 +193,6 @@ def _voix_reelle(monkeypatch, resultat):
         "texte": "combien le soja à Bohicon", "duree_s": 1.0, "ms": 1, "moteur": "groq"})
     appel_id = _bip()["appel_id"]
     client.post(f"{BASE}/{appel_id}/decroche")
-    client.post(f"{BASE}/{appel_id}/touche", json={"touche": "2"})
     t = client.post(f"{BASE}/{appel_id}/touche", json={"touche": "3"}).json()
     assert t["attente"] == "voix"
     return _voix(appel_id).json()
@@ -222,9 +221,9 @@ def test_phrases_audibles_clip_ou_navigateur(monkeypatch, tmp_path):
     monkeypatch.setattr(tts, "dossier_clips", tmp_path)
     monkeypatch.setattr(adaptateur, "_piper_pret", lambda: False)
     t = client.post(f"{BASE}/{_bip()['appel_id']}/decroche").json()
-    a01, p00 = t["phrases"]
-    assert a01["audio"] == "/audio/A01.wav" and a01["audio_source"] == "clip"
-    assert p00["audio"] is None and p00["audio_source"] == "navigateur"
+    a01, m01 = t["phrases"][0], t["phrases"][1]
+    assert a01["id"] == "A01" and a01["audio"] == "/audio/A01.wav" and a01["audio_source"] == "clip"
+    assert m01["id"] == "M01" and m01["audio"] is None and m01["audio_source"] == "navigateur"
 
 
 def test_page_simulateur_servie():
@@ -259,7 +258,6 @@ def test_web_haricot_cove_voix_puis_variete(monkeypatch):
 
     appel_id = _bip()["appel_id"]
     client.post(f"{BASE}/{appel_id}/decroche")
-    client.post(f"{BASE}/{appel_id}/touche", json={"touche": "2"})
     client.post(f"{BASE}/{appel_id}/touche", json={"touche": "3"})
     d = _voix(appel_id).json()
     assert d["transcription"] == "le prix du haricot à Covè"
