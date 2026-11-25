@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 from app.dialogue.nombres import date_en_lettres, en_lettres, francs
-from app.services.calculs import arrondir_au_franc, marche_prix_le_plus_eleve, vers_100kg
+from app.services.calculs import (
+    arrondir_au_franc,
+    marche_net_le_plus_eleve,
+    marche_prix_le_plus_eleve,
+    vers_100kg,
+)
+from app.services.transport import TOUCHE_COMMUNE  # noqa: F401 — réexporté pour le moteur
 
 # Phrases fixes (mêmes identifiants que app/voix/phrases.csv)
 TEXTES = {
@@ -35,6 +41,7 @@ TEXTES = {
     "O03": "Je n'ai pas bien compris le montant.",
     "O04": "Si c'est un sac de 100 kilos, tapez 1. Sinon, tapez 2.",
     "D02": "Il n'y a pas de prix récent pour ce produit sur ce marché.",
+    "C01": "Pour compter le transport, d'où partez-vous ? Abomey, tapez 1. Agbangnizoun, tapez 2. Bohicon, tapez 3. Covè, tapez 4. Djidja, tapez 5. Ouinhi, tapez 6. Zagnanado, tapez 7. Za-Kpota, tapez 8. Zogbodomey, tapez 9. Autre commune, tapez 0.",
     "O05": "Si c'est le prix d'un kilo, tapez 1. Si c'est le prix d'un sac de 100 kilos, tapez 2. Pour un autre sac, tapez 3.",
 }
 
@@ -98,11 +105,38 @@ def phrase_offre_kilo(offre_kg: float) -> str:
     return f"L'acheteur propose {en_lettres(offre)} {francs(offre)} le kilo."
 
 
-def phrase_offre_marche(c: dict) -> str:
+_VERDICTS_NET = {
+    "au-dessus": "l'offre est au-dessus de ce qui vous resterait",
+    "proche": "l'offre est proche de ce qui vous resterait",
+    "en dessous": "l'offre est en dessous de ce qui vous resterait",
+}
+
+
+def phrase_offre_marche_transport(c: dict, commune: str) -> str:
+    """Prix de détail, date, transport depuis la commune, net et verdict sur le net."""
+    ref = arrondir_au_franc(c["reference_kg"])
+    cout = arrondir_au_franc(c["transport_kg"])
+    net = arrondir_au_franc(c["net_kg"])
+    estime = c.get("statut_transport") != "verifie"
+    transport = (
+        f"Le transport depuis {commune} coûte environ {en_lettres(cout)} {francs(cout)} le kilo"
+        + (", c'est une estimation" if estime else "")
+    )
+    verdict = _VERDICTS_NET.get(c.get("verdict"), "l'offre a été comparée à ce montant")
+    return (
+        f"À {c['marche']}, le kilo est à {en_lettres(ref)} {francs(ref)}, "
+        f"relevé le {date_en_lettres(c['date_releve'])}. {transport}. "
+        f"Il vous resterait {en_lettres(net)} {francs(net)} : {verdict}."
+    )
+
+
+def phrase_offre_marche(c: dict, commune: str | None = None) -> str:
     """Une phrase par marché : prix de détail, date du relevé, verdict."""
     if c.get("reference_kg") is None:
         return f"À {c['marche']}, il n'y a pas de prix récent pour ce produit."
     ref = arrondir_au_franc(c["reference_kg"])
+    if c.get("net_kg") is not None and commune:
+        return phrase_offre_marche_transport(c, commune)
     verdict = _VERDICTS_MARCHE.get(c.get("verdict"), "l'offre a été comparée à ce prix")
     return (
         f"À {c['marche']}, le kilo est à {en_lettres(ref)} {francs(ref)}, "
@@ -115,9 +149,13 @@ def phrases_offre(o: dict) -> list[str]:
     marches = o.get("marches")
     if marches:
         phrases = [phrase_offre_kilo(o["offre_kg"])]
-        phrases += [phrase_offre_marche(c) for c in marches]
+        commune = o.get("commune")
+        phrases += [phrase_offre_marche(c, commune) for c in marches]
+        meilleur_net = marche_net_le_plus_eleve(marches) if commune else None
         meilleur = marche_prix_le_plus_eleve(marches)
-        if meilleur:
+        if meilleur_net:
+            phrases.append(f"Après le transport, c'est à {meilleur_net} qu'il vous resterait le plus.")
+        elif meilleur:
             phrases.append(f"Le prix de détail le plus élevé est à {meilleur}.")
         return phrases
 

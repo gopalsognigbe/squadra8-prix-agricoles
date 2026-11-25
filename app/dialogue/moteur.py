@@ -44,6 +44,8 @@ class Services:
     # Touche 3 : question(valeur_voix) -> dict (voir app/dialogue/question_voix.py).
     # None = pas d'IA branchée → « bientôt disponible ».
     question: Callable[[str], dict] | None = None
+    # Coûts de transport branchés : on demande la commune avant de juger une offre.
+    transport_actif: bool = False
 
 
 @dataclass
@@ -63,6 +65,9 @@ class Session:
     marche_offre: str | None = None
     # Après le menu : "prix" ou "offre" en attente du choix produit (P00).
     apres_produit: str | None = None
+    # Commune de départ (transport) : None = pas encore demandée ; "autre" = hors liste.
+    commune: str | None = None
+    offre_en_attente: int | None = None
 
 
 class Moteur:
@@ -156,6 +161,9 @@ class Moteur:
         if sess.etat == "CHOISIR_UNITE":
             return self._choisir_unite(sess, t)
 
+        if sess.etat == "CHOIX_COMMUNE":
+            return self._choisir_commune(sess, t)
+
         return self._erreur(sess)
 
     # ---------- touche 3 : question à voix haute ----------
@@ -187,6 +195,8 @@ class Moteur:
         famille = res.get("famille") or (sess.produit or "").split(" ")[0] or None
         if famille not in T.TOUCHE_PRODUIT.values():
             return self._menu(sess, prefixe=[self._p("N01"), self._p("X03")])
+        if res.get("commune") and sess.commune is None:
+            sess.commune = res["commune"]  # « je suis à Zagnanado » : pas besoin de redemander
         sess.voix = {
             "intention": intention,
             "famille": famille,
@@ -325,15 +335,33 @@ class Moteur:
 
     def _juger(self, sess, montant_sac):
         """Juge un montant pour 100 kg (touche 2 ou touche 3)."""
+        if self.services.transport_actif and sess.commune is None:
+            # Commune inconnue : on la demande avant le verdict (transport déduit).
+            sess.offre_en_attente = montant_sac
+            return self._tour(sess, "CHOIX_COMMUNE", [self._p("C01")],
+                              touches=list(T.TOUCHE_COMMUNE) + ["0"])
+        options = {}
         if sess.marche_offre:
-            offre = self.services.offre(sess.produit, montant_sac, marche=sess.marche_offre)
-        else:
-            offre = self.services.offre(sess.produit, montant_sac)
+            options["marche"] = sess.marche_offre
+        if sess.commune and sess.commune != "autre":
+            options["commune"] = sess.commune
+        offre = self.services.offre(sess.produit, montant_sac, **options)
         sess.marche_offre = None
         if offre is None:
             return self._reponse(sess, [self._p("D01"), self._p("R01")])
         phrases = [self._d(x) for x in T.phrases_offre(offre)] + [self._p("R01")]
         return self._reponse(sess, phrases)
+
+    def _choisir_commune(self, sess, t):
+        montant = sess.offre_en_attente
+        if montant is None:
+            return self._menu(sess)
+        if t in T.TOUCHE_COMMUNE or t == "0":
+            self._ok(sess)
+            sess.commune = T.TOUCHE_COMMUNE.get(t, "autre")
+            sess.offre_en_attente = None
+            return self._juger(sess, montant)
+        return self._erreur(sess)
 
     def _montant_invalide(self, sess):
         sess.montant = ""

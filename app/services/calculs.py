@@ -59,6 +59,7 @@ def comparer_offre_marches(
     liste: list[dict],
     ordre: tuple[str, ...] | list[str],
     marche_dit: str | None = None,
+    transport=None,
 ) -> list[dict]:
     """Compare l'offre (F/kg) au prix de détail de chaque marché de ``ordre``.
 
@@ -66,6 +67,12 @@ def comparer_offre_marches(
     Le marché dit (touche 3) passe en premier, puis les autres dans l'ordre.
     Un marché sans prix est rendu avec ``reference_kg = None`` : aucun prix
     n'est jamais inventé. Les seuils restent ceux de :func:`juger_offre`.
+
+    ``transport(marche) -> dict | None`` (optionnel) : coût estimé ou vérifié
+    depuis la commune de l'appelant (clés ``cout_kg`` et ``statut``). S'il est
+    connu, le verdict compare l'offre au NET (prix de détail − transport) ;
+    le verdict sur le prix brut reste dans ``verdict_brut``. Sans coût : rien
+    ne change.
     """
     par_marche = {p["marche"]: p for p in liste}
     noms = list(ordre)
@@ -84,13 +91,36 @@ def comparer_offre_marches(
                              "verdict": None})
             continue
         ref = float(p.get("prix_kg", p.get("prix_fcfa")))
-        resultat.append({
+        ligne = {
             "marche": nom,
             "reference_kg": ref,
             "date_releve": p["date_releve"],
             **juger_offre(offre_kg, ref),
-        })
+        }
+        cout = transport(nom) if transport else None
+        if cout is not None:
+            net = ref - float(cout["cout_kg"])
+            if net > 0:
+                ligne["verdict_brut"] = ligne["verdict"]
+                ligne.update(juger_offre(offre_kg, net))
+                ligne.update({
+                    "transport_kg": float(cout["cout_kg"]),
+                    "statut_transport": cout.get("statut", "estime"),
+                    "net_kg": net,
+                })
+        resultat.append(ligne)
     return resultat
+
+
+def marche_net_le_plus_eleve(comparaisons: list[dict]) -> str | None:
+    """Marché où il resterait le plus après transport (au franc), s'il est seul en tête."""
+    avec_net = [c for c in comparaisons if c.get("net_kg") is not None]
+    if len(avec_net) < 2:
+        return None
+    tries = sorted(avec_net, key=lambda c: arrondir_au_franc(c["net_kg"]), reverse=True)
+    if arrondir_au_franc(tries[0]["net_kg"]) == arrondir_au_franc(tries[1]["net_kg"]):
+        return None
+    return tries[0]["marche"]
 
 
 def marche_prix_le_plus_eleve(comparaisons: list[dict]) -> str | None:

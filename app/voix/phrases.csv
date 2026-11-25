@@ -25,4 +25,5 @@ V02;Pour le haricot blanc, tapez 1. Pour le haricot noir, tapez 2. Pour le haric
 O03;Je n'ai pas bien compris le montant.;
 O04;Si c'est un sac de 100 kilos, tapez 1. Sinon, tapez 2.;
 D02;Il n'y a pas de prix récent pour ce produit sur ce marché.;
+C01;Pour compter le transport, d'où partez-vous ? Abomey, tapez 1. Agbangnizoun, tapez 2. Bohicon, tapez 3. Covè, tapez 4. Djidja, tapez 5. Ouinhi, tapez 6. Zagnanado, tapez 7. Za-Kpota, tapez 8. Zogbodomey, tapez 9. Autre commune, tapez 0.;
 O05;Si c'est le prix d'un kilo, tapez 1. Si c'est le prix d'un sac de 100 kilos, tapez 2. Pour un autre sac, tapez 3.;

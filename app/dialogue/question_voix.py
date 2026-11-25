@@ -20,6 +20,7 @@ None : le moteur demande à l'appelant au lieu de deviner.
     marche    : "Bohicon" | "Houndjro (Abomey)" | "Azogotchébou (Covè)" | None
     montant   : int | None   (francs, tel que dit)
     unite     : "kg" | "100kg" | "sac" | None
+    commune   : commune de départ dite (« je suis à Zagnanado »), sinon None
 """
 
 from __future__ import annotations
@@ -37,6 +38,7 @@ from app.ia.regles import (
     trouver_produit,
     trouver_variete,
 )
+from app.services.transport import trouver_commune
 from app.ia.transcription import AudioTropLong, transcrire
 
 logger = logging.getLogger(__name__)
@@ -54,6 +56,7 @@ def _resultat(erreur: str | None, texte: str = "", **autres) -> dict:
         "marche": None,
         "montant": None,
         "unite": None,
+        "commune": None,
     }
     base.update(autres)
     return base
@@ -127,4 +130,6 @@ def _fusionner(texte: str, compris: dict) -> dict:
         marche=marche,
         montant=montant,
         unite=unite,
+        # Commune de départ : règle seule (tournure « je suis à … »), jamais devinée.
+        commune=trouver_commune(texte),
     )

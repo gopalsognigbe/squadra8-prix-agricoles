@@ -227,3 +227,33 @@ def rappels(db: Session = Depends(get_session),
     return [{"id": r.id, "numero_hash": r.numero_hash, "motif": r.motif,
              "cree_le": r.cree_le.isoformat() if r.cree_le else None,
              "statut": r.statut} for r in rows]
+
+
+# ---------- Coûts de transport (estimations à vérifier par l'équipe) ----------
+class TransportIn(BaseModel):
+    cout_sac_100kg: int | None = Field(default=None, ge=0, le=100000)
+    cout_min: int | None = Field(default=None, ge=0, le=100000)
+    cout_max: int | None = Field(default=None, ge=0, le=100000)
+    mode: str | None = Field(default=None, max_length=120)
+    source: str | None = Field(default=None, max_length=500)
+    statut: Literal["estime", "verifie"] | None = None
+
+
+@router.get("/transport")
+def lister_transport(user: Utilisateur = Depends(_require_roles("admin", "validateur", "saisie"))):
+    from app.services.transport import lire_couts
+    return lire_couts()
+
+
+@router.put("/transport/{id_ligne}")
+def modifier_transport(id_ligne: int, body: TransportIn, db: Session = Depends(get_session),
+                       user: Utilisateur = Depends(_require_roles("admin", "validateur"))):
+    from app.services.transport import modifier_cout
+    ligne = modifier_cout(id_ligne, body.model_dump(exclude_none=True), auteur=user.email,
+                          quand=datetime.now(timezone.utc).isoformat(timespec="seconds"))
+    if ligne is None:
+        raise HTTPException(404, "Coût de transport introuvable.")
+    _journal(db, user, "transport_modification",
+             f"{ligne['commune']} → {ligne['marche']} : {ligne['cout_sac_100kg']} F/sac ({ligne['statut']})")
+    db.commit()
+    return ligne
