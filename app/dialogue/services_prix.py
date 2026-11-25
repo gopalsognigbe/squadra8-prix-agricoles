@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from app.dialogue.moteur import Services
 from app.dialogue.question_voix import analyser_question
-from app.services.calculs import juger_offre
-from app.services.source_prix import get_source_prix
+from app.services.calculs import comparer_offre_marches
+from app.services.source_prix import ORDRE_MARCHES, get_source_prix
 
 
 def services_reels() -> Services:
@@ -18,18 +18,21 @@ def services_reels() -> Services:
         liste = get_source_prix().prix_du_jour(produit)
         if not liste:
             return None
-        # Marché dit à la touche 3 s'il a un prix récent ; sinon même règle que
-        # POST /api/offre : premier marché disponible (le marché est annoncé).
-        du_marche = [p for p in liste if p["marche"] == marche]
-        ref = du_marche[0] if du_marche else liste[0]
         offre_kg = float(montant_sac) / 100.0
-        jugement = juger_offre(offre_kg, float(ref["prix_kg"]))
+        # Offre comparée aux 3 marchés (marché dit à la touche 3 en premier).
+        # Un marché sans prix récent est signalé, jamais complété.
+        marches = comparer_offre_marches(offre_kg, liste, ORDRE_MARCHES, marche_dit=marche)
+        ref = next(c for c in marches if c["reference_kg"] is not None)
         return {
             "offre_kg": offre_kg,
-            "reference_kg": float(ref["prix_kg"]),
+            # Champs historiques : premier marché ayant un prix.
+            "reference_kg": ref["reference_kg"],
             "marche": ref["marche"],
             "date_releve": ref["date_releve"],
-            **jugement,
+            "ecart_f": ref["ecart_f"],
+            "ecart_pct": ref["ecart_pct"],
+            "verdict": ref["verdict"],
+            "marches": marches,
         }
 
     return Services(prix=prix, offre=offre, question=analyser_question)

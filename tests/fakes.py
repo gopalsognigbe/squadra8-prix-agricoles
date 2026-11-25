@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from app.dialogue.moteur import Services
-from app.services.calculs import juger_offre, vers_100kg
+from app.services.calculs import comparer_offre_marches, vers_100kg
+from app.services.source_prix import ORDRE_MARCHES
 
 SOURCE = "SIM-Bénin (FAO FPMA)"
 
@@ -93,17 +94,19 @@ def services_fakes(*, sans_prix: bool = False, journal=None, question=None) -> S
         liste = _liste(produit)
         if not liste:
             return None
-        # Marché demandé s'il a un prix, sinon premier de la liste (Bohicon).
-        du_marche = [p for p in liste if p["marche"] == marche]
-        ref = du_marche[0] if du_marche else liste[0]
+        # Même règle que services_reels : les 3 marchés, marché dit en premier.
         offre_kg = float(montant_sac) / 100.0
-        jugement = juger_offre(offre_kg, float(ref["prix_fcfa"]))
+        marches = comparer_offre_marches(offre_kg, liste, ORDRE_MARCHES, marche_dit=marche)
+        ref = next(c for c in marches if c["reference_kg"] is not None)
         return {
             "offre_kg": offre_kg,
-            "reference_kg": float(ref["prix_fcfa"]),
+            "reference_kg": ref["reference_kg"],
             "marche": ref["marche"],
             "date_releve": ref["date_releve"],
-            **jugement,
+            "ecart_f": ref["ecart_f"],
+            "ecart_pct": ref["ecart_pct"],
+            "verdict": ref["verdict"],
+            "marches": marches,
         }
 
     kw = {"question": question or _question_en_panne}

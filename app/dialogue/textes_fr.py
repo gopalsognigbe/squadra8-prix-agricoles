@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from app.dialogue.nombres import date_en_lettres, en_lettres, francs
-from app.services.calculs import arrondir_au_franc, vers_100kg
+from app.services.calculs import arrondir_au_franc, marche_prix_le_plus_eleve, vers_100kg
 
 # Phrases fixes (mêmes identifiants que app/voix/phrases.csv)
 TEXTES = {
@@ -86,8 +86,43 @@ def phrase_cent_kilos(p: dict) -> str:
     )
 
 
+_VERDICTS_MARCHE = {
+    "au-dessus": "l'offre est au-dessus de ce prix",
+    "proche": "l'offre est proche de ce prix",
+    "en dessous": "l'offre est en dessous de ce prix",
+}
+
+
+def phrase_offre_kilo(offre_kg: float) -> str:
+    offre = arrondir_au_franc(offre_kg)
+    return f"L'acheteur propose {en_lettres(offre)} {francs(offre)} le kilo."
+
+
+def phrase_offre_marche(c: dict) -> str:
+    """Une phrase par marché : prix de détail, date du relevé, verdict."""
+    if c.get("reference_kg") is None:
+        return f"À {c['marche']}, il n'y a pas de prix récent pour ce produit."
+    ref = arrondir_au_franc(c["reference_kg"])
+    verdict = _VERDICTS_MARCHE.get(c.get("verdict"), "l'offre a été comparée à ce prix")
+    return (
+        f"À {c['marche']}, le kilo est à {en_lettres(ref)} {francs(ref)}, "
+        f"relevé le {date_en_lettres(c['date_releve'])} : {verdict}."
+    )
+
+
 def phrases_offre(o: dict) -> list[str]:
-    """Annonce l'offre avec le verdict de juger_offre et la date du relevé."""
+    """Annonce l'offre comparée au prix de détail de chaque marché (date du relevé)."""
+    marches = o.get("marches")
+    if marches:
+        phrases = [phrase_offre_kilo(o["offre_kg"])]
+        phrases += [phrase_offre_marche(c) for c in marches]
+        meilleur = marche_prix_le_plus_eleve(marches)
+        if meilleur:
+            phrases.append(f"Le prix de détail le plus élevé est à {meilleur}.")
+        return phrases
+
+    # Ancien format (un seul marché) : gardé pour les services qui ne
+    # renvoient pas encore « marches ».
     verdict = o.get("verdict", "")
     if verdict == "proche":
         jugement = "L'offre est proche du prix de détail."
@@ -98,10 +133,9 @@ def phrases_offre(o: dict) -> list[str]:
     else:
         jugement = "L'offre a été comparée au prix de détail."
 
-    ref = float(o["reference_kg"])
-    offre = float(o["offre_kg"])
+    ref = arrondir_au_franc(o["reference_kg"])
     return [
-        f"L'acheteur propose {en_lettres(offre)} {francs(offre)} le kilo.",
+        phrase_offre_kilo(o["offre_kg"]),
         (
             f"Au détail, le kilo est à {en_lettres(ref)} {francs(ref)} "
             f"à {o['marche']}, relevé le {date_en_lettres(o['date_releve'])}."

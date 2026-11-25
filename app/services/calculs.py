@@ -52,3 +52,56 @@ def juger_offre(offre_kg: float, prix_detail_kg: float) -> dict:
         "ecart_pct": ecart_pct,
         "verdict": verdict,
     }
+
+
+def comparer_offre_marches(
+    offre_kg: float,
+    liste: list[dict],
+    ordre: tuple[str, ...] | list[str],
+    marche_dit: str | None = None,
+) -> list[dict]:
+    """Compare l'offre (F/kg) au prix de détail de chaque marché de ``ordre``.
+
+    ``liste`` : prix disponibles (un par marché, clé ``prix_kg`` ou ``prix_fcfa``).
+    Le marché dit (touche 3) passe en premier, puis les autres dans l'ordre.
+    Un marché sans prix est rendu avec ``reference_kg = None`` : aucun prix
+    n'est jamais inventé. Les seuils restent ceux de :func:`juger_offre`.
+    """
+    par_marche = {p["marche"]: p for p in liste}
+    noms = list(ordre)
+    for p in liste:  # marché présent dans les données mais hors de l'ordre
+        if p["marche"] not in noms:
+            noms.append(p["marche"])
+    if marche_dit in noms:
+        noms.remove(marche_dit)
+        noms.insert(0, marche_dit)
+
+    resultat: list[dict] = []
+    for nom in noms:
+        p = par_marche.get(nom)
+        if p is None:
+            resultat.append({"marche": nom, "reference_kg": None, "date_releve": None,
+                             "verdict": None})
+            continue
+        ref = float(p.get("prix_kg", p.get("prix_fcfa")))
+        resultat.append({
+            "marche": nom,
+            "reference_kg": ref,
+            "date_releve": p["date_releve"],
+            **juger_offre(offre_kg, ref),
+        })
+    return resultat
+
+
+def marche_prix_le_plus_eleve(comparaisons: list[dict]) -> str | None:
+    """Marché au prix de détail le plus élevé (au franc), s'il est seul en tête.
+
+    Rien si moins de deux marchés ont un prix, ou en cas d'égalité.
+    """
+    avec_prix = [c for c in comparaisons if c.get("reference_kg") is not None]
+    if len(avec_prix) < 2:
+        return None
+    tries = sorted(avec_prix, key=lambda c: arrondir_au_franc(c["reference_kg"]), reverse=True)
+    if arrondir_au_franc(tries[0]["reference_kg"]) == arrondir_au_franc(tries[1]["reference_kg"]):
+        return None
+    return tries[0]["marche"]
