@@ -215,8 +215,13 @@ async function afficherTour(tour) {
   if (tour.fin) return finAppel("Le service a raccroché.");
   majAttente(tour, false);
   if (tour.attente === "voix") {
+    $("processus").textContent = "Touche 3 · posez votre question après le bip";
     await bip();
     statut("À vous de parler");
+  } else if (tour.attente === "touche") {
+    $("processus").textContent = "Tapez une touche du clavier";
+  } else if (tour.attente === "montant") {
+    $("processus").textContent = "Tapez le montant, puis #";
   }
 }
 
@@ -289,6 +294,9 @@ async function decrocher() {
   $("compris").classList.add("cache");
   etat.compteurs = { clip: 0, navigateur: 0 };
   montrer("vue-appel");
+  $("processus").textContent = "Appel en cours…";
+  $("retranscription").classList.add("cache");
+  $("retranscription").innerHTML = "";
   try {
     await afficherTour(await appeler(`/appels/${etat.appelId}/decroche`));
   } catch (e) { echec(e); }
@@ -417,6 +425,9 @@ async function basculerMicro() {
   const debut = Date.now();
   $("micro").classList.add("enregistre");
   $("decrocher").classList.add("enregistre");
+  $("processus").textContent = "1/3 Enregistrement… (bouton vert pour envoyer)";
+  $("retranscription").classList.remove("cache");
+  $("retranscription").innerHTML = "<span class=\"titre\">Vous parlez</span><span class=\"citation\">Enregistrement en cours…</span>";
   statut("Enregistrement…");
   majSoftkeys("vue-appel");
   etat.finEnregistrement = setInterval(() => {
@@ -445,25 +456,46 @@ async function envoyerVoix(mime) {
   if (!etat.appelId) return;
   const blob = new Blob(etat.morceaux, { type: mime });
   const ext = mime.includes("mp4") ? "m4a" : mime.includes("ogg") ? "ogg" : "webm";
-  const li = bulle("paysan", "🎤 <i>Transcription en cours…</i>");
+  const li = bulle("paysan", "🎤 Retranscription en français…");
   $("micro").disabled = true;
-  statut("Le service réfléchit…");
+  $("processus").textContent = "2/3 Retranscription en français…";
+  $("retranscription").classList.remove("cache");
+  $("retranscription").innerHTML = "<span class=\"titre\">Retranscription</span><span class=\"citation\">Le service écrit ce que vous avez dit…</span>";
+  statut("Retranscription…");
   const form = new FormData();
   form.append("fichier", blob, `question.${ext}`);
   try {
     const r = await appeler(`/appels/${etat.appelId}/voix`, { body: form });
-    li.innerHTML = r.transcription ? `🎤 « ${echapper(r.transcription)} »` : "🎤 <i>(rien de compris)</i>";
+    const texte = (r.transcription || "").trim();
+    li.innerHTML = texte
+      ? `🎤 Vous : « ${echapper(texte)} »`
+      : "🎤 <i>(rien n'a été compris)</i>";
+    afficherRetranscription(r);
     if (r.erreur === "audio_trop_long") erreur(`Question trop longue : ${etat.tour?.delai_s || 12} secondes au plus.`);
     else if (r.erreur === "transcription_indisponible") erreur("Transcription impossible : vérifiez internet et la clé Groq dans le .env (ou le Whisper local).");
     afficherCompris(r);
+    $("processus").textContent = "3/3 Réponse du service";
     await afficherTour(r);
   } catch (e) {
     li.innerHTML = "🎤 <i>non envoyé</i>";
+    $("retranscription").innerHTML = "<span class=\"titre\">Retranscription</span><span class=\"citation\">Échec de l'envoi.</span>";
     echec(e);
   }
 }
 
 const NOMS_INTENTION = { prix: "demande de prix", juger_offre: "offre d'un acheteur", hors_sujet: "hors sujet", inconnu: "pas comprise" };
+
+function afficherRetranscription(r) {
+  const box = $("retranscription");
+  const texte = (r.transcription || "").trim();
+  box.classList.remove("cache");
+  if (!texte) {
+    box.innerHTML = "<span class=\"titre\">Retranscription en français</span><span class=\"citation\">(rien n'a été compris)</span>";
+    return;
+  }
+  box.innerHTML = `<span class="titre">Retranscription en français</span><span class="citation">« ${echapper(texte)} »</span>`;
+}
+
 function afficherCompris(r) {
   const box = $("compris");
   if (!r.intention && !r.compris) return box.classList.add("cache");
