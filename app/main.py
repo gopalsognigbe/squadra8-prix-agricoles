@@ -64,9 +64,18 @@ app.state.settings = get_settings()
 _admin_dir = Path(__file__).resolve().parents[1] / "web" / "admin"
 if _admin_dir.is_dir():
     app.mount("/admin", StaticFiles(directory=_admin_dir, html=True), name="admin")
+class _SansCache(StaticFiles):
+    """Le navigateur recharge toujours la page : jamais d'ancienne version en démo."""
+
+    async def get_response(self, path, scope):
+        reponse = await super().get_response(path, scope)
+        reponse.headers["Cache-Control"] = "no-store"
+        return reponse
+
+
 _sim_dir = Path(__file__).resolve().parents[1] / "web" / "simulateur"
 if _sim_dir.is_dir():
-    app.mount("/simulateur", StaticFiles(directory=_sim_dir, html=True), name="simulateur")
+    app.mount("/simulateur", _SansCache(directory=_sim_dir, html=True), name="simulateur")
 # Clips de voix (Piper) : voix/clips, ou VOIX_CLIPS_DIR. Dossier ignoré par Git.
 _clips_dir = PiperTTS().dossier_clips
 try:

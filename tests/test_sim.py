@@ -233,3 +233,46 @@ def test_page_simulateur_servie():
     assert client.get("/simulateur/app.js").status_code == 200
     r = client.get("/", follow_redirects=False)
     assert r.status_code in (302, 307) and r.headers["location"] == "/simulateur/"
+
+
+def test_web_haricot_cove_voix_puis_variete(monkeypatch):
+    """Parcours web exact : /voix « haricot à Covè » → /touche variété → seul Covè."""
+    from app.dialogue import question_voix
+    from app.dialogue.moteur import Services
+    from app.ia.intention import comprendre_par_regles
+
+    marches = ["Bohicon", "Houndjro (Abomey)", "Azogotchébou (Covè)"]
+
+    def prix(produit):
+        return [{"marche": m, "prix_fcfa": 600.0, "prix_kg": 600.0, "prix_100kg": 60000.0,
+                 "unite": "Kilogramme", "type_prix": "detail", "date_releve": "2026-10-28",
+                 "source": "test"} for m in marches]
+
+    services = Services(prix=prix, offre=lambda *a, **k: None,
+                        question=question_voix.analyser_question)
+    moteur = Moteur(sim.suivre_question(services), voix_active=True)
+    monkeypatch.setattr(sim, "get_moteur", lambda: moteur)
+    monkeypatch.setattr(question_voix, "comprendre",
+                        lambda texte, echeance=None: comprendre_par_regles(texte))
+    monkeypatch.setattr(sim, "transcrire_detail", lambda chemin: {
+        "texte": "le prix du haricot à Covè", "duree_s": 1.0, "ms": 1, "moteur": "faux"})
+
+    appel_id = _bip()["appel_id"]
+    client.post(f"{BASE}/{appel_id}/decroche")
+    client.post(f"{BASE}/{appel_id}/touche", json={"touche": "2"})
+    client.post(f"{BASE}/{appel_id}/touche", json={"touche": "3"})
+    d = _voix(appel_id).json()
+    assert d["transcription"] == "le prix du haricot à Covè"
+    assert d["etat"] == "CHOIX_VARIETE"
+    assert d["compris"]["marche"] == "Azogotchébou (Covè)"
+    assert sim._APPELS[appel_id][0].voix["marche"] == "Azogotchébou (Covè)"
+    t = client.post(f"{BASE}/{appel_id}/touche", json={"touche": "2"}).json()
+    textes = " ".join(p["texte"] for p in t["phrases"])
+    assert "Azogotchébou (Covè) :" in textes
+    assert "Bohicon :" not in textes and "Houndjro (Abomey) :" not in textes
+
+
+def test_page_simulateur_jamais_en_cache():
+    r = client.get("/simulateur/app.js")
+    assert r.headers["cache-control"] == "no-store"
+    assert "Ce que le service a compris" in r.text

@@ -158,6 +158,8 @@ def post_voix(appel_id: str, fichier: UploadFile = File(...)) -> dict:
     if isinstance(compris, dict) and not compris.get("erreur"):
         reponse["intention"] = compris.get("intention")
         reponse["compris"] = {k: compris.get(k) for k in CHAMPS_COMPRIS}
+    # Visible dans le terminal d'uvicorn : ce qui a été entendu et compris.
+    log.warning("voix : « %s » → compris %s → %s", texte, reponse.get("compris"), tour.etat)
     if erreur:
         reponse["erreur"] = erreur
     return reponse
