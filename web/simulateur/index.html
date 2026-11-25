@@ -3,12 +3,97 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Simulateur – Squadra 8</title>
+  <title>Simulateur d'appel – Squadra 8</title>
+  <link rel="icon" href="data:,">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Simulateur d'appel</h1>
-  <p>Page à construire (4e développeur). Cet écran servira de faux téléphone pour la démo, sans vrai appel.</p>
+  <header class="entete">
+    <div>
+      <h1>Prix agricoles du Zou</h1>
+      <p>Simulateur d'appel · Squadra 8 · marchés de Bohicon, Houndjro (Abomey) et Azogotchébou (Covè)</p>
+    </div>
+    <button id="son" class="bouton-son" type="button" aria-pressed="true" title="Couper ou activer le son">🔊 Son activé</button>
+  </header>
+
+  <main class="scene">
+    <section class="telephone" aria-label="Faux téléphone">
+      <div class="haut-parleur"></div>
+      <div class="ecran">
+        <div class="barre">
+          <span id="statut" class="statut">Prêt</span>
+          <span id="minuteur" class="minuteur"></span>
+        </div>
+
+        <!-- 1. Avant l'appel : le paysan bipe le service -->
+        <div id="vue-bip" class="vue">
+          <p class="consigne">Entrez votre numéro, puis bipez le service. Il vous rappelle gratuitement.</p>
+          <label for="numero" class="etiquette">Votre numéro</label>
+          <input id="numero" type="tel" inputmode="tel" autocomplete="off" value="+22990000000"
+                 pattern="^\+\d{8,15}$" aria-describedby="aide-numero">
+          <small id="aide-numero" class="aide">Format : +229 suivi de 8 à 10 chiffres, sans espace.</small>
+          <button id="biper" class="bouton principal" type="button">📞 Biper</button>
+        </div>
+
+        <!-- 2. Le service rappelle -->
+        <div id="vue-sonnerie" class="vue cache">
+          <div class="appelant">
+            <div class="avatar sonne">🌽</div>
+            <p class="nom">Service des prix agricoles</p>
+            <p id="texte-sonnerie" class="sous-titre">Le service va vous rappeler…</p>
+          </div>
+          <div class="ligne-boutons">
+            <button id="refuser" class="bouton rond rouge" type="button" title="Refuser">✕</button>
+            <button id="decrocher" class="bouton rond vert" type="button" title="Décrocher" disabled>✆</button>
+          </div>
+        </div>
+
+        <!-- 3. En communication -->
+        <div id="vue-appel" class="vue cache">
+          <ol id="fil" class="fil" aria-live="polite"></ol>
+          <div id="attente" class="attente"></div>
+          <div id="compris" class="compris cache"></div>
+        </div>
+
+        <div id="erreur" class="erreur cache" role="alert"></div>
+      </div>
+
+      <div id="commandes" class="commandes cache">
+        <div class="clavier" id="clavier">
+          <button type="button" data-touche="1">1</button>
+          <button type="button" data-touche="2">2<small>ABC</small></button>
+          <button type="button" data-touche="3">3<small>DEF</small></button>
+          <button type="button" data-touche="4">4<small>GHI</small></button>
+          <button type="button" data-touche="5">5<small>JKL</small></button>
+          <button type="button" data-touche="6">6<small>MNO</small></button>
+          <button type="button" data-touche="7">7<small>PQRS</small></button>
+          <button type="button" data-touche="8">8<small>TUV</small></button>
+          <button type="button" data-touche="9">9<small>WXYZ</small></button>
+          <button type="button" data-touche="*">*</button>
+          <button type="button" data-touche="0">0</button>
+          <button type="button" data-touche="#">#</button>
+        </div>
+        <div class="ligne-boutons">
+          <button id="micro" class="bouton micro" type="button" disabled>🎤 Parler</button>
+          <button id="raccrocher" class="bouton rond rouge" type="button" title="Raccrocher">✆</button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="aide-demo">
+      <h2>Le menu</h2>
+      <ul>
+        <li><b>1</b> prix sur 3 marchés</li>
+        <li><b>2</b> juger l'offre d'un acheteur</li>
+        <li><b>3</b> poser sa question à voix haute</li>
+        <li><b>4</b> réécouter</li>
+      </ul>
+      <h2>La voix</h2>
+      <p id="info-voix">Les phrases sont jouées avec les clips enregistrés quand ils existent ; sinon le navigateur lit le texte.</p>
+      <p class="petit">Le micro ne marche que sur <code>localhost</code> ou en <code>https</code>.</p>
+    </aside>
+  </main>
+
   <script src="app.js"></script>
 </body>
 </html>

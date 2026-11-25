@@ -1,5 +1,126 @@
-/* Styles du simulateur. Responsable : 4e développeur. */
+/* Styles du simulateur (faux téléphone). Aucun framework, aucun CDN. */
+:root {
+  --vert: #1f8a4c; --vert-clair: #e7f5ec; --rouge: #d64040; --or: #e0a526;
+  --encre: #1d2a22; --gris: #6b7a70; --fond: #f4f1e8; --carte: #ffffff;
+}
+* { box-sizing: border-box; }
 body {
-  font-family: sans-serif;
-  margin: 2rem;
+  margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--encre); background: linear-gradient(160deg, #f8f4e6 0%, #e9f1e4 100%);
+  min-height: 100vh;
+}
+.entete {
+  display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+  padding: 1rem 1.5rem; background: var(--vert); color: #fff; flex-wrap: wrap;
+}
+.entete h1 { margin: 0; font-size: 1.35rem; }
+.entete p { margin: .2rem 0 0; opacity: .9; font-size: .9rem; }
+.bouton-son {
+  border: 2px solid #fff; background: transparent; color: #fff; border-radius: 999px;
+  padding: .45rem .9rem; font-size: .95rem; cursor: pointer;
+}
+.bouton-son[aria-pressed="false"] { background: #fff; color: var(--rouge); }
+
+.scene {
+  display: flex; gap: 2rem; justify-content: center; align-items: flex-start;
+  padding: 1.5rem 1rem 3rem; flex-wrap: wrap;
+}
+.telephone {
+  width: 360px; max-width: 100%; background: #16201a; border-radius: 42px;
+  padding: 18px 14px 22px; box-shadow: 0 20px 50px rgba(0,0,0,.25);
+}
+.haut-parleur { width: 70px; height: 6px; border-radius: 3px; background: #3a463e; margin: 0 auto 12px; }
+.ecran {
+  background: var(--carte); border-radius: 26px; min-height: 360px; padding: 14px;
+  display: flex; flex-direction: column; position: relative;
+}
+.barre { display: flex; justify-content: space-between; font-size: .8rem; color: var(--gris); margin-bottom: 8px; }
+.statut { font-weight: 600; color: var(--vert); }
+.vue { flex: 1; display: flex; flex-direction: column; }
+.cache { display: none !important; }
+.consigne { margin: .3rem 0 1rem; line-height: 1.4; }
+.etiquette { font-size: .85rem; color: var(--gris); }
+input[type=tel] {
+  font-size: 1.3rem; padding: .6rem .7rem; border: 2px solid #cfd8d2; border-radius: 12px;
+  margin: .3rem 0 .2rem; width: 100%;
+}
+input[type=tel]:focus { outline: none; border-color: var(--vert); }
+.aide { color: var(--gris); font-size: .78rem; margin-bottom: 1rem; }
+.bouton {
+  border: 0; border-radius: 14px; padding: .8rem 1rem; font-size: 1.05rem; cursor: pointer;
+  font-weight: 600;
+}
+.bouton:disabled { opacity: .45; cursor: not-allowed; }
+.principal { background: var(--vert); color: #fff; margin-top: auto; }
+.rond { width: 64px; height: 64px; border-radius: 50%; font-size: 1.6rem; padding: 0; color: #fff; }
+.vert { background: var(--vert); }
+.rouge { background: var(--rouge); }
+#raccrocher { transform: rotate(135deg); }
+.ligne-boutons { display: flex; justify-content: space-around; align-items: center; gap: 1rem; margin-top: 14px; }
+
+.appelant { text-align: center; margin: 1.5rem 0; flex: 1; }
+.avatar {
+  width: 96px; height: 96px; border-radius: 50%; background: var(--vert-clair);
+  margin: 0 auto 1rem; display: grid; place-items: center; font-size: 3rem;
+}
+.avatar.sonne { animation: sonne 1s infinite; }
+@keyframes sonne {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(31,138,76,.45); transform: rotate(0); }
+  10% { transform: rotate(-8deg); } 20% { transform: rotate(8deg); } 30% { transform: rotate(0); }
+  70% { box-shadow: 0 0 0 22px rgba(31,138,76,0); }
+}
+.nom { font-weight: 700; font-size: 1.1rem; margin: 0; }
+.sous-titre { color: var(--gris); margin: .3rem 0 0; }
+
+.fil {
+  list-style: none; margin: 0; padding: 0; flex: 1; overflow-y: auto; max-height: 380px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.fil li { max-width: 88%; padding: .55rem .7rem; border-radius: 14px; line-height: 1.35; font-size: .93rem; }
+.fil .service { background: var(--vert-clair); align-self: flex-start; border-bottom-left-radius: 4px; }
+.fil .service.en-cours { outline: 2px solid var(--vert); }
+.fil .paysan { background: #fff3d6; align-self: flex-end; border-bottom-right-radius: 4px; }
+.fil .code {
+  display: inline-block; font-family: ui-monospace, Menlo, monospace; font-size: .72rem;
+  background: #fff; border: 1px solid #cfe3d6; border-radius: 6px; padding: 0 .3rem; margin-right: .35rem;
+  color: var(--vert);
+}
+.fil .source { display: block; font-size: .7rem; color: var(--gris); margin-top: .2rem; }
+.attente {
+  margin-top: 10px; padding: .5rem .7rem; border-radius: 10px; background: #f1f4f2;
+  font-size: .85rem; color: var(--encre);
+}
+.attente b { color: var(--vert); }
+.compris { margin-top: 8px; font-size: .8rem; background: #fffaf0; border: 1px dashed var(--or); border-radius: 10px; padding: .45rem .6rem; }
+.erreur {
+  margin-top: 10px; background: #fdecec; color: #8d1f1f; border: 1px solid #f1b5b5;
+  border-radius: 10px; padding: .55rem .7rem; font-size: .88rem;
+}
+
+.commandes { margin-top: 14px; }
+.clavier { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.clavier button {
+  height: 58px; border-radius: 18px; border: 0; background: #2b372f; color: #fff;
+  font-size: 1.45rem; cursor: pointer; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; line-height: 1; transition: background .15s;
+}
+.clavier button small { font-size: .55rem; letter-spacing: .08em; opacity: .6; margin-top: 2px; }
+.clavier button.valide { background: var(--vert); box-shadow: 0 0 0 2px #7fd3a2 inset; }
+.clavier button:active { transform: scale(.96); }
+.micro { background: var(--or); color: #2b1d00; flex: 1; }
+.micro.enregistre { background: var(--rouge); color: #fff; animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: .75; } }
+
+.aide-demo {
+  max-width: 300px; background: rgba(255,255,255,.75); border-radius: 18px; padding: 1rem 1.2rem;
+  box-shadow: 0 6px 20px rgba(0,0,0,.06);
+}
+.aide-demo h2 { font-size: 1rem; margin: .4rem 0 .5rem; color: var(--vert); }
+.aide-demo ul { padding-left: 1rem; margin: 0 0 1rem; line-height: 1.7; }
+.petit { font-size: .8rem; color: var(--gris); }
+
+@media (max-width: 720px) {
+  .scene { padding: .8rem .5rem 2rem; gap: 1rem; }
+  .telephone { border-radius: 28px; padding: 12px 10px 16px; }
+  .aide-demo { max-width: 360px; width: 100%; }
 }

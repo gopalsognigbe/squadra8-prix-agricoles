@@ -128,7 +128,8 @@ def test_voix_transcrit_puis_passe_au_moteur(monkeypatch):
     assert d["transcription"] == "combien le soja à Bohicon" and "intention" in d
     assert d["etat"] == "MENU_PRINCIPAL"
     ev = moteur.evenements[-1]
-    assert ev.type == "VOIX" and ev.valeur == d["transcription"]
+    # Texte déjà transcrit : préfixe « texte: » pour ne pas le retranscrire.
+    assert ev.type == "VOIX" and ev.valeur == "texte:" + d["transcription"]
     assert vu["chemin"].endswith(".webm") and vu["existe"]
     assert not os.path.exists(vu["chemin"])
 
@@ -182,3 +183,53 @@ def test_moteur_reel_se_construit():
         assert isinstance(_GET_MOTEUR_REEL(), Moteur)
     finally:
         _GET_MOTEUR_REEL.cache_clear()
+
+
+def _voix_reelle(monkeypatch, resultat):
+    services = services_fakes(question=lambda valeur: {**resultat, "vu": valeur})
+    moteur = Moteur(sim.suivre_question(services), voix_active=True)
+    monkeypatch.setattr(sim, "get_moteur", lambda: moteur)
+    monkeypatch.setattr(sim, "transcrire_detail", lambda chemin: {
+        "texte": "combien le soja à Bohicon", "duree_s": 1.0, "ms": 1, "moteur": "groq"})
+    appel_id = _bip()["appel_id"]
+    client.post(f"{BASE}/{appel_id}/decroche")
+    client.post(f"{BASE}/{appel_id}/touche", json={"touche": "2"})
+    t = client.post(f"{BASE}/{appel_id}/touche", json={"touche": "3"}).json()
+    assert t["attente"] == "voix"
+    return _voix(appel_id).json()
+
+
+def test_voix_renvoie_intention(monkeypatch):
+    d = _voix_reelle(monkeypatch, {
+        "erreur": None, "texte": "combien le soja à Bohicon", "intention": "prix",
+        "famille": "soja", "variete": None, "marche": "Bohicon",
+        "montant": None, "unite": None})
+    assert d["intention"] == "prix"
+    assert d["compris"]["famille"] == "soja" and d["compris"]["marche"] == "Bohicon"
+    assert "vu" not in d["compris"]
+
+
+def test_voix_sans_intention_si_erreur_ia(monkeypatch):
+    d = _voix_reelle(monkeypatch, {"erreur": "ia", "intention": "inconnu"})
+    assert d["intention"] is None and "compris" not in d
+
+
+def test_phrases_audibles_clip_ou_navigateur(monkeypatch, tmp_path):
+    from app.dialogue.adaptateurs import sim as adaptateur
+
+    (tmp_path / "A01.wav").write_bytes(b"RIFF")
+    tts = adaptateur._tts()
+    monkeypatch.setattr(tts, "dossier_clips", tmp_path)
+    monkeypatch.setattr(adaptateur, "_piper_pret", lambda: False)
+    t = client.post(f"{BASE}/{_bip()['appel_id']}/decroche").json()
+    a01, p00 = t["phrases"]
+    assert a01["audio"] == "/audio/A01.wav" and a01["audio_source"] == "clip"
+    assert p00["audio"] is None and p00["audio_source"] == "navigateur"
+
+
+def test_page_simulateur_servie():
+    r = client.get("/simulateur/")
+    assert r.status_code == 200 and "Biper" in r.text
+    assert client.get("/simulateur/app.js").status_code == 200
+    r = client.get("/", follow_redirects=False)
+    assert r.status_code in (302, 307) and r.headers["location"] == "/simulateur/"
