@@ -11,11 +11,13 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
 from app.api import admin, ia, prix, sim, twilio
 from app.config import get_settings
+from app.voix.piper_tts import PiperTTS
 from data.scripts.maj_fao import lancer_maj_fao
 
 logger = logging.getLogger(__name__)
@@ -62,12 +64,37 @@ app.state.settings = get_settings()
 _admin_dir = Path(__file__).resolve().parents[1] / "web" / "admin"
 if _admin_dir.is_dir():
     app.mount("/admin", StaticFiles(directory=_admin_dir, html=True), name="admin")
+class _SansCache(StaticFiles):
+    """Le navigateur recharge toujours la page : jamais d'ancienne version en démo."""
+
+    async def get_response(self, path, scope):
+        reponse = await super().get_response(path, scope)
+        reponse.headers["Cache-Control"] = "no-store"
+        return reponse
+
+
+_sim_dir = Path(__file__).resolve().parents[1] / "web" / "simulateur"
+if _sim_dir.is_dir():
+    app.mount("/simulateur", _SansCache(directory=_sim_dir, html=True), name="simulateur")
+# Clips de voix (Piper) : voix/clips, ou VOIX_CLIPS_DIR. Dossier ignoré par Git.
+_clips_dir = PiperTTS().dossier_clips
+try:
+    _clips_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/audio", StaticFiles(directory=_clips_dir), name="audio")
+except OSError:
+    logger.warning("Dossier des clips inaccessible : %s (pas de /audio)", _clips_dir)
 
 app.include_router(sim.router, prefix="/api/sim", tags=["simulateur"])
 app.include_router(prix.router, prefix="/api", tags=["prix"])
 app.include_router(ia.router, prefix="/api/ia", tags=["ia"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(twilio.router, prefix="/twilio", tags=["twilio"])
+
+
+@app.get("/", include_in_schema=False)
+def accueil() -> RedirectResponse:
+    """La racine ouvre le simulateur (démo)."""
+    return RedirectResponse("/simulateur/")
 
 
 @app.get("/sante")

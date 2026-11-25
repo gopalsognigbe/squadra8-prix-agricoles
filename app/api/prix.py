@@ -11,9 +11,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field, model_validator
 
-from app.services.calculs import juger_offre
+from app.services.calculs import comparer_offre_marches, juger_offre
 from app.services import prix_service
-from app.services.source_prix import resoudre_produit
+from app.services.source_prix import ORDRE_MARCHES, resoudre_produit
 
 router = APIRouter()
 
@@ -118,6 +118,12 @@ def post_offre(body: OffreIn) -> dict:
         offre_kg = float(body.montant_sac) / 100.0  # type: ignore[arg-type]
 
     jugement = juger_offre(offre_kg, float(ref["prix_kg"]))
+    # Même offre comparée aux 3 marchés (marché de référence en premier) ;
+    # un marché sans prix récent a reference_kg = None (jamais inventé).
+    dispo = [p for p in prix_service.prix_du_jour(produit_fao) if p["marche"] != ref["marche"]]
+    marches = comparer_offre_marches(
+        offre_kg, [ref, *dispo], ORDRE_MARCHES, marche_dit=ref["marche"],
+    )
     return {
         "disponible": True,
         "produit": ref["produit"],
@@ -127,4 +133,5 @@ def post_offre(body: OffreIn) -> dict:
         "prix_fcfa": ref["prix_fcfa"],
         "offre_kg": offre_kg,
         **jugement,
+        "marches": marches,
     }

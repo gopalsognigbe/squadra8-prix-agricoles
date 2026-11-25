@@ -3,12 +3,119 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Simulateur – Squadra 8</title>
-  <link rel="stylesheet" href="style.css">
+  <title>Simulateur d'appel – Squadra 8</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
-  <h1>Simulateur d'appel</h1>
-  <p>Page à construire (4e développeur). Cet écran servira de faux téléphone pour la démo, sans vrai appel.</p>
-  <script src="app.js"></script>
+  <header class="entete">
+    <div>
+      <h1>Prix agricoles du Zou</h1>
+      <p>Simulateur d'appel · Squadra 8 · marchés de Bohicon, Houndjro (Abomey) et Azogotchébou (Covè)</p>
+    </div>
+    <button id="son" class="bouton-son" type="button" aria-pressed="true" title="Couper ou activer le son">🔊 Son activé</button>
+  </header>
+
+  <main class="scene">
+    <section class="telephone nokia" aria-label="Faux téléphone Nokia à touches">
+      <div class="antenne" aria-hidden="true"></div>
+      <div class="coque">
+        <div class="marque">NOKIA</div>
+        <div class="haut-parleur" aria-hidden="true"></div>
+
+        <div class="ecran">
+          <div class="barre">
+            <span id="statut" class="statut">Prêt</span>
+            <span id="minuteur" class="minuteur"></span>
+          </div>
+
+          <div id="vue-bip" class="vue">
+            <p class="consigne">Tapez le numéro au clavier, puis le bouton vert pour biper.</p>
+            <p class="etiquette">Votre numéro</p>
+            <p id="affichage-numero" class="affichage-numero">+22990000000</p>
+            <input id="numero" type="hidden" value="+22990000000">
+            <p id="aide-numero" class="aide">Touches 0–9 · * efface · vert = Biper</p>
+          </div>
+
+          <div id="vue-sonnerie" class="vue cache">
+            <div class="appelant">
+              <p class="nom">Service prix</p>
+              <p id="texte-sonnerie" class="sous-titre">Appel entrant…</p>
+              <p class="icone-appel" aria-hidden="true">☎</p>
+            </div>
+          </div>
+
+          <div id="vue-appel" class="vue cache">
+            <p id="processus" class="processus" aria-live="polite"></p>
+            <div id="retranscription" class="retranscription cache" aria-live="polite"></div>
+            <ol id="fil" class="fil" aria-live="polite"></ol>
+            <div id="attente" class="attente"></div>
+            <div id="compris" class="compris cache"></div>
+          </div>
+
+          <div id="erreur" class="erreur cache" role="alert"></div>
+
+          <div class="soft-labels">
+            <span id="label-gauche">Biper</span>
+            <span id="label-droite">Effacer</span>
+          </div>
+        </div>
+
+        <div class="nav-physique">
+          <button id="soft-gauche" class="softkey" type="button" title="Touche gauche"></button>
+          <button id="nav-rond" class="nav-rond" type="button" title="OK"></button>
+          <button id="soft-droite" class="softkey" type="button" title="Touche droite"></button>
+        </div>
+
+        <div class="touches-appel">
+          <button id="decrocher" class="bouton-appel vert" type="button" title="Appeler / décrocher" disabled>✆</button>
+          <button id="raccrocher" class="bouton-appel rouge" type="button" title="Raccrocher">✆</button>
+        </div>
+        <button id="biper" class="cache" type="button">Biper</button>
+        <button id="refuser" class="cache" type="button">Refuser</button>
+        <button id="micro" class="cache" type="button">Parler</button>
+
+        <div id="commandes" class="commandes">
+          <div class="clavier" id="clavier">
+            <button type="button" data-touche="1">1</button>
+            <button type="button" data-touche="2">2<small>ABC</small></button>
+            <button type="button" data-touche="3">3<small>DEF</small></button>
+            <button type="button" data-touche="4">4<small>GHI</small></button>
+            <button type="button" data-touche="5">5<small>JKL</small></button>
+            <button type="button" data-touche="6">6<small>MNO</small></button>
+            <button type="button" data-touche="7">7<small>PQRS</small></button>
+            <button type="button" data-touche="8">8<small>TUV</small></button>
+            <button type="button" data-touche="9">9<small>WXYZ</small></button>
+            <button type="button" data-touche="*">*</button>
+            <button type="button" data-touche="0">0<small>+</small></button>
+            <button type="button" data-touche="#">#</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="aide-demo">
+      <h2>Le téléphone</h2>
+      <ul>
+        <li><b>Clavier</b> pour le numéro et le menu</li>
+        <li><b>Vert à gauche</b> biper / décrocher / parler</li>
+        <li><b>Rouge à droite</b> effacer / refuser / raccrocher</li>
+        <li><b>*</b> sur l'écran d'accueil : efface un chiffre</li>
+      </ul>
+      <h2>Le menu</h2>
+      <ul>
+        <li><b>1</b> prix sur 3 marchés</li>
+        <li><b>2</b> juger l'offre d'un acheteur</li>
+        <li><b>3</b> poser sa question à voix haute</li>
+        <li><b>4</b> réécouter</li>
+      </ul>
+      <h2>La voix</h2>
+      <p id="info-voix">Les phrases sont jouées avec les clips enregistrés quand ils existent ; sinon le navigateur lit le texte.</p>
+      <p class="petit">Le micro ne marche que sur <code>localhost</code> ou en <code>https</code>.</p>
+      <p class="petit">Version de la page : <b id="version-page">v2 · transcription affichée</b></p>
+    </aside>
+  </main>
+
+  <script src="app.js?v=2"></script>
 </body>
 </html>

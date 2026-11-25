@@ -61,6 +61,8 @@ class Session:
     # Touche 3 : demande comprise en attente d'une précision (couleur, sac).
     voix: dict | None = None
     marche_offre: str | None = None
+    # Après le menu : "prix" ou "offre" en attente du choix produit (P00).
+    apres_produit: str | None = None
 
 
 class Moteur:
@@ -79,9 +81,9 @@ class Moteur:
         if sess.etat == "FIN" or ev.type == "RACCROCHE":
             return self._fin(sess)
         if ev.type == "DECROCHE" and sess.etat == "ACCUEIL":
-            return self._tour(sess, "CHOIX_PRODUIT",
-                              [self._p("A01"), self._p("P00")],
-                              touches=["1", "2", "3"], repetition=[self._p("P00")])
+            # Menu service d'abord (prix / offre / voix / réécouter) ; le produit
+            # n'est demandé qu'au besoin (touche 1 ou 2 sans produit déjà choisi).
+            return self._menu(sess, prefixe=[self._p("A01")])
         if ev.type == "SILENCE":
             return self._silence(sess)
         if ev.type == "TOUCHE":
@@ -100,15 +102,28 @@ class Moteur:
             if t in T.TOUCHE_PRODUIT:
                 self._ok(sess)
                 sess.produit = T.TOUCHE_PRODUIT[t]
+                action = sess.apres_produit
+                sess.apres_produit = None
+                if action == "prix":
+                    return self._prix(sess)
+                if action == "offre":
+                    sess.montant = ""
+                    sess.marche_offre = None
+                    return self._tour(sess, "OFFRE_MONTANT", [self._p("O01")],
+                                      attente="montant", touches=CHIFFRES + ["#"])
                 return self._menu(sess)
             return self._erreur(sess)
 
         if sess.etat == "MENU_PRINCIPAL":
             if t == "1":
                 self._ok(sess)
+                if not sess.produit:
+                    return self._demander_produit(sess, "prix")
                 return self._prix(sess)
             if t == "2":
                 self._ok(sess)
+                if not sess.produit:
+                    return self._demander_produit(sess, "offre")
                 sess.montant = ""
                 sess.marche_offre = None
                 return self._tour(sess, "OFFRE_MONTANT", [self._p("O01")],
@@ -255,6 +270,12 @@ class Moteur:
             return self._tour(sess, "OFFRE_MONTANT", [self._p("O01")],
                               attente="montant", touches=CHIFFRES + ["#"])
         return self._erreur(sess)
+
+    def _demander_produit(self, sess, action: str):
+        """P00 après le menu : prix ou offre, dès qu'un produit est choisi."""
+        sess.apres_produit = action
+        return self._tour(sess, "CHOIX_PRODUIT", [self._p("P00")],
+                          touches=["1", "2", "3"], repetition=[self._p("P00")])
 
     def _menu(self, sess, prefixe=None):
         menu = [self._p("M01"), self._p("M02"),

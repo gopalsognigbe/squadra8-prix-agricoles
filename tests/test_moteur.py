@@ -26,29 +26,46 @@ def nouvel_appel(**kw):
 
 
 def au_menu(**kw):
-    jouer = nouvel_appel(**kw)
+    """Décroche au menu principal, produit = maïs (sans annoncer les prix)."""
+    fakes_kw = kw.pop("fakes", {})
+    moteur = Moteur(services_fakes(**fakes_kw), **kw)
+    sess = moteur.nouvelle_session("test")
+
+    def jouer(type_: str, valeur: str | None = None):
+        return moteur.traiter(sess, Evenement(type=type_, valeur=valeur))
+
     jouer("DECROCHE")
-    jouer("TOUCHE", "1")  # maïs
+    sess.produit = "mais"
     return jouer
 
 
 def test_accueil() -> None:
     jouer = nouvel_appel()
     tour = jouer("DECROCHE")
-    assert tour.etat == "CHOIX_PRODUIT"
+    assert tour.etat == "MENU_PRINCIPAL"
     assert "service des prix agricoles" in texte(tour)
+    assert "prix sur 3 marchés" in texte(tour)
+    assert "juger l'offre" in texte(tour)
     assert tour.attente == "touche"
-    assert tour.touches_valides == ["1", "2", "3"]
+    assert tour.touches_valides == ["1", "2", "3", "4"]
 
 
 def test_menu_trois_marches_pas_aujourdhui() -> None:
     jouer = nouvel_appel()
-    jouer("DECROCHE")
-    menu = jouer("TOUCHE", "1")
+    menu = jouer("DECROCHE")
     t = texte(menu)
     assert "3 marchés" in t
     assert "aujourd'hui" not in t.casefold()
     assert "bientôt disponible" in t  # voix désactivée par défaut
+
+
+def test_prix_demande_le_produit_puis_annonce() -> None:
+    jouer = nouvel_appel()
+    jouer("DECROCHE")
+    choix = jouer("TOUCHE", "1")
+    assert choix.etat == "CHOIX_PRODUIT" and "maïs" in texte(choix).casefold()
+    tour = jouer("TOUCHE", "1")  # maïs
+    assert "Bohicon" in texte(tour) and tour.etat == "MENU_PRINCIPAL"
 
 
 def test_parcours_nominal() -> None:
@@ -80,7 +97,7 @@ def test_touche_invalide_puis_fin() -> None:
     jouer = nouvel_appel()
     jouer("DECROCHE")
     tour = jouer("TOUCHE", "9")
-    assert tour.etat == "CHOIX_PRODUIT" and "pas valide" in texte(tour) and not tour.fin
+    assert tour.etat == "MENU_PRINCIPAL" and "pas valide" in texte(tour) and not tour.fin
     jouer("TOUCHE", "9")
     assert jouer("TOUCHE", "9").fin
 
@@ -139,8 +156,7 @@ def test_prix_absent() -> None:
 
 def test_voix_desactivee_par_defaut() -> None:
     jouer = nouvel_appel()  # voix_active=False par défaut
-    jouer("DECROCHE")
-    menu = jouer("TOUCHE", "1")
+    menu = jouer("DECROCHE")
     assert "bientôt disponible" in texte(menu)
     tour = jouer("TOUCHE", "3")
     assert "arrive bientôt" in texte(tour) and tour.etat == "MENU_PRINCIPAL"
@@ -201,8 +217,8 @@ def test_moteur_avec_source_reelle_date_releve() -> None:
     moteur = Moteur(services_reels(), voix_active=False)
     sess = moteur.nouvelle_session("csv")
     moteur.traiter(sess, Evenement(type="DECROCHE"))
-    moteur.traiter(sess, Evenement(type="TOUCHE", valeur="1"))  # maïs
-    tour = moteur.traiter(sess, Evenement(type="TOUCHE", valeur="1"))  # prix
+    moteur.traiter(sess, Evenement(type="TOUCHE", valeur="1"))  # prix → produit
+    tour = moteur.traiter(sess, Evenement(type="TOUCHE", valeur="1"))  # maïs → prix
     t = texte(tour)
     assert "relevé le vingt-cinq octobre" in t  # Bohicon
     assert "aujourd'hui" not in t.casefold()

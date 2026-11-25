@@ -84,12 +84,12 @@ def test_appel_complet_avec_le_vrai_moteur():
     appel_id = _bip()["appel_id"]
     t = client.post(f"{BASE}/{appel_id}/decroche").json()
     assert {"etat", "phrases", "attente", "touches_valides", "delai_s", "fin"} <= set(t)
-    assert t["etat"] == "CHOIX_PRODUIT" and t["phrases"]
+    assert t["etat"] == "MENU_PRINCIPAL" and t["phrases"]
     assert {"id", "texte", "audio"} <= set(t["phrases"][0])
     t = client.post(f"{BASE}/{appel_id}/touche", json={"touche": "1"}).json()
-    assert t["etat"] == "MENU_PRINCIPAL"
+    assert t["etat"] == "CHOIX_PRODUIT"  # prix → demande le produit
     t = client.post(f"{BASE}/{appel_id}/touche", json={"touche": "1"}).json()
-    assert t["phrases"]
+    assert t["phrases"]  # maïs → annonce des prix
     assert client.post(f"{BASE}/{appel_id}/raccroche").json() == {"ok": True}
     assert client.post(f"{BASE}/{appel_id}/decroche").status_code == 404
 
@@ -128,7 +128,8 @@ def test_voix_transcrit_puis_passe_au_moteur(monkeypatch):
     assert d["transcription"] == "combien le soja à Bohicon" and "intention" in d
     assert d["etat"] == "MENU_PRINCIPAL"
     ev = moteur.evenements[-1]
-    assert ev.type == "VOIX" and ev.valeur == d["transcription"]
+    # Texte déjà transcrit : préfixe « texte: » pour ne pas le retranscrire.
+    assert ev.type == "VOIX" and ev.valeur == "texte:" + d["transcription"]
     assert vu["chemin"].endswith(".webm") and vu["existe"]
     assert not os.path.exists(vu["chemin"])
 
@@ -182,3 +183,94 @@ def test_moteur_reel_se_construit():
         assert isinstance(_GET_MOTEUR_REEL(), Moteur)
     finally:
         _GET_MOTEUR_REEL.cache_clear()
+
+
+def _voix_reelle(monkeypatch, resultat):
+    services = services_fakes(question=lambda valeur: {**resultat, "vu": valeur})
+    moteur = Moteur(sim.suivre_question(services), voix_active=True)
+    monkeypatch.setattr(sim, "get_moteur", lambda: moteur)
+    monkeypatch.setattr(sim, "transcrire_detail", lambda chemin: {
+        "texte": "combien le soja à Bohicon", "duree_s": 1.0, "ms": 1, "moteur": "groq"})
+    appel_id = _bip()["appel_id"]
+    client.post(f"{BASE}/{appel_id}/decroche")
+    t = client.post(f"{BASE}/{appel_id}/touche", json={"touche": "3"}).json()
+    assert t["attente"] == "voix"
+    return _voix(appel_id).json()
+
+
+def test_voix_renvoie_intention(monkeypatch):
+    d = _voix_reelle(monkeypatch, {
+        "erreur": None, "texte": "combien le soja à Bohicon", "intention": "prix",
+        "famille": "soja", "variete": None, "marche": "Bohicon",
+        "montant": None, "unite": None})
+    assert d["intention"] == "prix"
+    assert d["compris"]["famille"] == "soja" and d["compris"]["marche"] == "Bohicon"
+    assert "vu" not in d["compris"]
+
+
+def test_voix_sans_intention_si_erreur_ia(monkeypatch):
+    d = _voix_reelle(monkeypatch, {"erreur": "ia", "intention": "inconnu"})
+    assert d["intention"] is None and "compris" not in d
+
+
+def test_phrases_audibles_clip_ou_navigateur(monkeypatch, tmp_path):
+    from app.dialogue.adaptateurs import sim as adaptateur
+
+    (tmp_path / "A01.wav").write_bytes(b"RIFF")
+    tts = adaptateur._tts()
+    monkeypatch.setattr(tts, "dossier_clips", tmp_path)
+    monkeypatch.setattr(adaptateur, "_piper_pret", lambda: False)
+    t = client.post(f"{BASE}/{_bip()['appel_id']}/decroche").json()
+    a01, m01 = t["phrases"][0], t["phrases"][1]
+    assert a01["id"] == "A01" and a01["audio"] == "/audio/A01.wav" and a01["audio_source"] == "clip"
+    assert m01["id"] == "M01" and m01["audio"] is None and m01["audio_source"] == "navigateur"
+
+
+def test_page_simulateur_servie():
+    r = client.get("/simulateur/")
+    assert r.status_code == 200 and "Biper" in r.text
+    assert client.get("/simulateur/app.js").status_code == 200
+    r = client.get("/", follow_redirects=False)
+    assert r.status_code in (302, 307) and r.headers["location"] == "/simulateur/"
+
+
+def test_web_haricot_cove_voix_puis_variete(monkeypatch):
+    """Parcours web exact : /voix « haricot à Covè » → /touche variété → seul Covè."""
+    from app.dialogue import question_voix
+    from app.dialogue.moteur import Services
+    from app.ia.intention import comprendre_par_regles
+
+    marches = ["Bohicon", "Houndjro (Abomey)", "Azogotchébou (Covè)"]
+
+    def prix(produit):
+        return [{"marche": m, "prix_fcfa": 600.0, "prix_kg": 600.0, "prix_100kg": 60000.0,
+                 "unite": "Kilogramme", "type_prix": "detail", "date_releve": "2026-10-28",
+                 "source": "test"} for m in marches]
+
+    services = Services(prix=prix, offre=lambda *a, **k: None,
+                        question=question_voix.analyser_question)
+    moteur = Moteur(sim.suivre_question(services), voix_active=True)
+    monkeypatch.setattr(sim, "get_moteur", lambda: moteur)
+    monkeypatch.setattr(question_voix, "comprendre",
+                        lambda texte, echeance=None: comprendre_par_regles(texte))
+    monkeypatch.setattr(sim, "transcrire_detail", lambda chemin: {
+        "texte": "le prix du haricot à Covè", "duree_s": 1.0, "ms": 1, "moteur": "faux"})
+
+    appel_id = _bip()["appel_id"]
+    client.post(f"{BASE}/{appel_id}/decroche")
+    client.post(f"{BASE}/{appel_id}/touche", json={"touche": "3"})
+    d = _voix(appel_id).json()
+    assert d["transcription"] == "le prix du haricot à Covè"
+    assert d["etat"] == "CHOIX_VARIETE"
+    assert d["compris"]["marche"] == "Azogotchébou (Covè)"
+    assert sim._APPELS[appel_id][0].voix["marche"] == "Azogotchébou (Covè)"
+    t = client.post(f"{BASE}/{appel_id}/touche", json={"touche": "2"}).json()
+    textes = " ".join(p["texte"] for p in t["phrases"])
+    assert "Azogotchébou (Covè) :" in textes
+    assert "Bohicon :" not in textes and "Houndjro (Abomey) :" not in textes
+
+
+def test_page_simulateur_jamais_en_cache():
+    r = client.get("/simulateur/app.js")
+    assert r.headers["cache-control"] == "no-store"
+    assert "Ce que le service a compris" in r.text

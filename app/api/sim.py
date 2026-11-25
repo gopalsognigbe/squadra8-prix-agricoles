@@ -5,6 +5,7 @@ Responsable : Guillaume.
 import logging
 import os
 import tempfile
+import threading
 import time
 import uuid
 from functools import lru_cache
@@ -14,7 +15,8 @@ from pydantic import BaseModel, Field
 
 from app.config import get_settings
 from app.dialogue.adaptateurs.sim import tour_vers_json
-from app.dialogue.moteur import Evenement, Moteur, Session
+from app.dialogue.moteur import Evenement, Moteur, Services, Session
+from app.dialogue.question_voix import PREFIXE_TEXTE
 from app.dialogue.services_prix import services_reels
 from app.ia.transcription import AudioTropLong, transcrire_detail
 from app.services.anti_abus import bip_autorise
@@ -31,6 +33,9 @@ EXTENSIONS = {"audio/webm": ".webm", "audio/ogg": ".ogg", "audio/wav": ".wav",
 
 # appel_id -> (session du moteur, dernière activité). En mémoire : démo seulement.
 _APPELS: dict[str, tuple[Session, float]] = {}
+# Dernier résultat de la touche 3 (par fil d'exécution) pour remplir « intention ».
+_SUIVI = threading.local()
+CHAMPS_COMPRIS = ("intention", "famille", "variete", "marche", "montant", "unite")
 
 
 class BipIn(BaseModel):
@@ -41,10 +46,25 @@ class ToucheIn(BaseModel):
     touche: str = Field(pattern=r"^[0-9*#]$")
 
 
+def suivre_question(services: Services) -> Services:
+    """Garde le résultat de services.question pour l'afficher dans le simulateur."""
+    origine = services.question
+    if origine is None:
+        return services
+
+    def question(valeur: str) -> dict:
+        res = origine(valeur)
+        _SUIVI.resultat = res
+        return res
+
+    services.question = question
+    return services
+
+
 @lru_cache
 def get_moteur() -> Moteur:
     s = get_settings()
-    return Moteur(services_reels(), voix_active=s.question_voix_active,
+    return Moteur(suivre_question(services_reels()), voix_active=s.question_voix_active,
                   delai_voix=int(getattr(s, "audio_max_s", 8)))
 
 
@@ -127,8 +147,19 @@ def post_voix(appel_id: str, fichier: UploadFile = File(...)) -> dict:
     texte, erreur = "", None
     if sess.etat == "QUESTION_VOIX":
         texte, erreur = _transcrire(donnees, _extension(fichier))
-    tour = get_moteur().traiter(sess, Evenement(type="VOIX", valeur=texte))
+    # Le texte est déjà transcrit : préfixe « texte: » pour que question_voix ne
+    # cherche pas à le retranscrire comme un fichier audio.
+    valeur = f"{PREFIXE_TEXTE}{texte}" if texte.strip() else ""
+    _SUIVI.resultat = None
+    tour = get_moteur().traiter(sess, Evenement(type="VOIX", valeur=valeur))
+    compris = getattr(_SUIVI, "resultat", None)
+    _SUIVI.resultat = None
     reponse = {**tour_vers_json(tour), "transcription": texte, "intention": None}
+    if isinstance(compris, dict) and not compris.get("erreur"):
+        reponse["intention"] = compris.get("intention")
+        reponse["compris"] = {k: compris.get(k) for k in CHAMPS_COMPRIS}
+    # Visible dans le terminal d'uvicorn : ce qui a été entendu et compris.
+    log.warning("voix : « %s » → compris %s → %s", texte, reponse.get("compris"), tour.etat)
     if erreur:
         reponse["erreur"] = erreur
     return reponse
