@@ -29,30 +29,22 @@
             <span id="minuteur" class="minuteur"></span>
           </div>
 
-          <!-- 1. Avant l'appel : le paysan bipe le service -->
           <div id="vue-bip" class="vue">
-            <p class="consigne">Entrez votre numéro, puis bipez. Le service rappelle gratuitement.</p>
-            <label for="numero" class="etiquette">Votre numéro</label>
-            <input id="numero" type="tel" inputmode="tel" autocomplete="off" value="+22990000000"
-                   pattern="^\+\d{8,15}$" aria-describedby="aide-numero">
-            <small id="aide-numero" class="aide">Format : +229 puis 8 à 10 chiffres.</small>
-            <button id="biper" class="bouton principal" type="button">📞 Biper</button>
+            <p class="consigne">Tapez le numéro au clavier, puis le bouton vert pour biper.</p>
+            <p class="etiquette">Votre numéro</p>
+            <p id="affichage-numero" class="affichage-numero">+22990000000</p>
+            <input id="numero" type="hidden" value="+22990000000">
+            <p id="aide-numero" class="aide">Touches 0–9 · * efface · vert = Biper</p>
           </div>
 
-          <!-- 2. Le service rappelle -->
           <div id="vue-sonnerie" class="vue cache">
             <div class="appelant">
               <p class="nom">Service prix</p>
               <p id="texte-sonnerie" class="sous-titre">Appel entrant…</p>
               <p class="icone-appel" aria-hidden="true">☎</p>
             </div>
-            <div class="ligne-boutons softkeys-ecran">
-              <button id="refuser" class="bouton soft rouge" type="button" title="Refuser">Refuser</button>
-              <button id="decrocher" class="bouton soft vert" type="button" title="Décrocher" disabled>Décrocher</button>
-            </div>
           </div>
 
-          <!-- 3. En communication -->
           <div id="vue-appel" class="vue cache">
             <ol id="fil" class="fil" aria-live="polite"></ol>
             <div id="attente" class="attente"></div>
@@ -60,19 +52,28 @@
           </div>
 
           <div id="erreur" class="erreur cache" role="alert"></div>
+
+          <div class="soft-labels">
+            <span id="label-gauche">Biper</span>
+            <span id="label-droite">Effacer</span>
+          </div>
         </div>
 
-        <div class="nav-physique" aria-hidden="true">
-          <div class="soft-gauche"></div>
-          <div class="nav-rond"></div>
-          <div class="soft-droite"></div>
+        <div class="nav-physique">
+          <button id="soft-gauche" class="softkey" type="button" title="Touche gauche"></button>
+          <button id="nav-rond" class="nav-rond" type="button" title="OK"></button>
+          <button id="soft-droite" class="softkey" type="button" title="Touche droite"></button>
         </div>
+
+        <div class="touches-appel">
+          <button id="decrocher" class="bouton-appel vert" type="button" title="Appeler / décrocher" disabled>✆</button>
+          <button id="raccrocher" class="bouton-appel rouge" type="button" title="Raccrocher">✆</button>
+        </div>
+        <button id="biper" class="cache" type="button">Biper</button>
+        <button id="refuser" class="cache" type="button">Refuser</button>
+        <button id="micro" class="cache" type="button">Parler</button>
 
         <div id="commandes" class="commandes">
-          <div class="touches-appel">
-            <button id="raccrocher" class="bouton-physique rouge" type="button" title="Raccrocher">✆</button>
-            <button id="micro" class="bouton-physique micro" type="button" disabled title="Parler">🎤</button>
-          </div>
           <div class="clavier" id="clavier">
             <button type="button" data-touche="1">1</button>
             <button type="button" data-touche="2">2<small>ABC</small></button>
@@ -92,6 +93,13 @@
     </section>
 
     <aside class="aide-demo">
+      <h2>Le téléphone</h2>
+      <ul>
+        <li><b>Clavier</b> pour le numéro et le menu</li>
+        <li><b>Vert à gauche</b> biper / décrocher / parler</li>
+        <li><b>Rouge à droite</b> effacer / refuser / raccrocher</li>
+        <li><b>*</b> sur l'écran d'accueil : efface un chiffre</li>
+      </ul>
       <h2>Le menu</h2>
       <ul>
         <li><b>1</b> prix sur 3 marchés</li>
@@ -102,7 +110,6 @@
       <h2>La voix</h2>
       <p id="info-voix">Les phrases sont jouées avec les clips enregistrés quand ils existent ; sinon le navigateur lit le texte.</p>
       <p class="petit">Le micro ne marche que sur <code>localhost</code> ou en <code>https</code>.</p>
-      <p class="petit">Téléphone : Nokia à touches (pas un smartphone).</p>
     </aside>
   </main>
 

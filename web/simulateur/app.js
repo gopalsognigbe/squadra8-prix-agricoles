@@ -25,10 +25,38 @@ const etat = {
 /* ---------- affichage ---------- */
 function montrer(vue) {
   for (const v of ["vue-bip", "vue-sonnerie", "vue-appel"]) $(v).classList.toggle("cache", v !== vue);
-  // Clavier Nokia toujours visible ; les touches ne servent qu'en appel.
   $("commandes").classList.remove("cache");
   const tel = document.querySelector(".telephone");
   if (tel) tel.dataset.vue = vue;
+  majSoftkeys(vue);
+}
+
+function majSoftkeys(vue) {
+  const gauche = $("label-gauche");
+  const droite = $("label-droite");
+  const vert = $("decrocher");
+  if (vue === "vue-bip") {
+    gauche.textContent = "Biper";
+    droite.textContent = "Effacer";
+    vert.disabled = false;
+  } else if (vue === "vue-sonnerie") {
+    gauche.textContent = vert.disabled ? "" : "Décrocher";
+    droite.textContent = "Refuser";
+  } else if (vue === "vue-appel") {
+    const voix = etat.tour && etat.tour.attente === "voix";
+    gauche.textContent = voix ? (etat.enregistreur ? "Envoyer" : "Parler") : "";
+    droite.textContent = "Raccro.";
+    vert.disabled = !voix;
+  }
+}
+
+function vueCourante() {
+  const tel = document.querySelector(".telephone");
+  return (tel && tel.dataset.vue) || "vue-bip";
+}
+
+function afficherNumero() {
+  $("affichage-numero").textContent = $("numero").value;
 }
 function statut(texte) { $("statut").textContent = texte; }
 function erreur(message) {
@@ -197,11 +225,12 @@ function majAttente(tour, pendantLecture) {
   document.querySelectorAll("#clavier button").forEach((b) => b.classList.toggle("valide", touches.includes(b.dataset.touche)));
   let html = `Le service attend : <b>${echapper(NOMS_ATTENTE[tour.attente] || tour.attente)}</b>`;
   if (tour.attente === "touche" && touches.length) html += ` (${touches.map(echapper).join(", ")})`;
-  if (tour.attente === "voix") html += ` · ${tour.delai_s} s au plus · appuyez sur 🎤`;
+  if (tour.attente === "voix") html += ` · ${tour.delai_s} s au plus · bouton vert pour parler`;
   if (pendantLecture && tour.phrases.length) html += "<br><small>Vous pouvez taper sans attendre la fin.</small>";
   $("attente").innerHTML = html;
   $("micro").disabled = tour.attente !== "voix" || !micPossible();
   statut(tour.fin ? "Fin de l'appel" : pendantLecture ? "Le service parle…" : "En communication");
+  majSoftkeys("vue-appel");
 }
 
 function majInfoVoix() {
@@ -214,30 +243,31 @@ function majInfoVoix() {
 /* ---------- déroulé de l'appel ---------- */
 async function biper() {
   erreur("");
-  contexteAudio(); // débloque le son grâce au clic
+  contexteAudio();
   if ("speechSynthesis" in window) speechSynthesis.getVoices();
   const numero = $("numero").value.replace(/\s+/g, "");
-  if (!/^\+\d{8,15}$/.test(numero)) return erreur("Numéro invalide : écrivez par exemple +22990000000.");
-  $("biper").disabled = true;
+  if (!/^\+\d{8,15}$/.test(numero)) return erreur("Numéro invalide : tapez +229 puis 8 à 10 chiffres.");
+  $("decrocher").disabled = true;
   try {
     const r = await appeler("/bip", json({ numero }));
     etat.appelId = r.appel_id;
     attendreRappel(r.rappel_dans_s ?? 5);
   } catch (e) {
+    $("decrocher").disabled = false;
     erreur(e.status === 429 ? "Trop de bips pour ce numéro. Réessayez plus tard." : e.message);
-  } finally {
-    $("biper").disabled = false;
   }
 }
 
 function attendreRappel(secondes) {
   montrer("vue-sonnerie");
   $("decrocher").disabled = true;
-  document.querySelector(".avatar").classList.remove("sonne");
+  const icone = document.querySelector(".icone-appel");
+  if (icone) icone.classList.add("attente");
   let reste = secondes;
   const maj = () => {
-    $("texte-sonnerie").textContent = `Bip reçu. Le service vous rappelle dans ${reste} s…`;
+    $("texte-sonnerie").textContent = `Bip reçu. Rappel dans ${reste} s…`;
     statut("Bip envoyé");
+    majSoftkeys("vue-sonnerie");
   };
   maj();
   etat.rappel = setInterval(() => {
@@ -246,8 +276,9 @@ function attendreRappel(secondes) {
     clearInterval(etat.rappel);
     $("texte-sonnerie").textContent = "Appel entrant…";
     statut("Ça sonne");
-    document.querySelector(".avatar").classList.add("sonne");
+    if (icone) icone.classList.remove("attente");
     $("decrocher").disabled = false;
+    majSoftkeys("vue-sonnerie");
     demarrerSonnerie();
   }, 1000);
 }
@@ -264,12 +295,36 @@ async function decrocher() {
 }
 
 let dernierMontant = null;
+
+function beepTouche(t) {
+  ton(697 + Number(t === "#" ? 12 : t === "*" ? 10 : t) * 20, 0, 0.12, 0.08);
+}
+
+function composer(t) {
+  const champ = $("numero");
+  let v = champ.value;
+  if (t === "*") {
+    if (v.length > 4) champ.value = v.slice(0, -1);
+  } else if (/^[0-9]$/.test(t)) {
+    if (v.length < 16) champ.value = v + t;
+  }
+  afficherNumero();
+  erreur("");
+}
+
 async function toucher(t) {
+  const vue = vueCourante();
+  beepTouche(t);
+  if (vue === "vue-bip") {
+    if (t === "*") return composer("*");
+    if (/^[0-9]$/.test(t)) return composer(t);
+    return;
+  }
+  if (vue !== "vue-appel") return;
   if (!etat.appelId || !etat.tour || etat.tour.fin) return;
-  if (etat.enregistreur) return erreur("Arrêtez d'abord l'enregistrement.");
+  if (etat.enregistreur) return erreur("Arrêtez d'abord l'enregistrement (bouton vert).");
   erreur("");
   arreterLecture();
-  ton(697 + Number(t === "#" ? 12 : t === "*" ? 10 : t) * 20, 0, 0.12, 0.08); // petit son de touche
   if (etat.tour.attente === "montant" && dernierMontant) {
     dernierMontant.querySelector(".valeur").textContent += t;
   } else {
@@ -281,6 +336,19 @@ async function toucher(t) {
     if (tour.attente !== "montant" || tour.phrases.length) dernierMontant = null;
     await afficherTour(tour);
   } catch (e) { echec(e); }
+}
+
+function actionVerte() {
+  const vue = vueCourante();
+  if (vue === "vue-bip") return biper();
+  if (vue === "vue-sonnerie" && !$("decrocher").disabled) return decrocher();
+  if (vue === "vue-appel" && etat.tour && etat.tour.attente === "voix") return basculerMicro();
+}
+
+function actionRouge() {
+  const vue = vueCourante();
+  if (vue === "vue-bip") return composer("*");
+  if (vue === "vue-sonnerie" || vue === "vue-appel") return raccrocher();
 }
 
 async function raccrocher() {
@@ -300,11 +368,12 @@ function finAppel(message) {
   dernierMontant = null;
   if (id && message !== "Vous avez raccroché.") appeler(`/appels/${id}/raccroche`).catch(() => {});
   statut("Appel terminé");
-  $("attente").innerHTML = `${echapper(message)} <button id="rappeler" class="bouton principal" type="button">Nouvel appel</button>`;
-  $("rappeler").onclick = () => { montrer("vue-bip"); statut("Prêt"); $("minuteur").textContent = ""; };
+  $("attente").textContent = message;
   document.querySelectorAll("#clavier button").forEach((b) => b.classList.remove("valide"));
   $("micro").disabled = true;
-  if ($("vue-appel").classList.contains("cache")) { montrer("vue-bip"); statut("Prêt"); }
+  montrer("vue-bip");
+  statut("Prêt");
+  $("minuteur").textContent = "";
 }
 
 function echec(e) {
@@ -347,9 +416,9 @@ async function basculerMicro() {
   const max = Math.max(2, (etat.tour?.delai_s || 12) - 0.5);
   const debut = Date.now();
   $("micro").classList.add("enregistre");
-  $("micro").textContent = "⏹";
-  $("micro").title = "Arrêter et envoyer";
+  $("decrocher").classList.add("enregistre");
   statut("Enregistrement…");
+  majSoftkeys("vue-appel");
   etat.finEnregistrement = setInterval(() => {
     const ecoule = (Date.now() - debut) / 1000;
     $("minuteur").textContent = `🎙 ${ecoule.toFixed(0)} / ${Math.round(max)} s`;
@@ -361,8 +430,8 @@ function arreterEnregistrement(annuler) {
   clearInterval(etat.finEnregistrement);
   $("minuteur").textContent = "";
   $("micro").classList.remove("enregistre");
-  $("micro").textContent = "🎤";
-  $("micro").title = "Parler";
+  $("decrocher").classList.remove("enregistre");
+  majSoftkeys("vue-appel");
   const rec = etat.enregistreur;
   etat.enregistreur = null;
   if (rec) {
@@ -407,17 +476,21 @@ function afficherCompris(r) {
   box.classList.remove("cache");
 }
 
-/* ---------- branchements ---------- */
+/* ---------- branchements : uniquement les touches du Nokia ---------- */
 $("biper").onclick = biper;
-$("numero").addEventListener("keydown", (e) => { if (e.key === "Enter") biper(); });
-$("decrocher").onclick = decrocher;
+$("decrocher").onclick = actionVerte;
+$("soft-gauche").onclick = actionVerte;
+$("nav-rond").onclick = actionVerte;
 $("refuser").onclick = raccrocher;
-$("raccrocher").onclick = raccrocher;
+$("raccrocher").onclick = actionRouge;
+$("soft-droite").onclick = actionRouge;
 $("micro").onclick = basculerMicro;
 document.querySelectorAll("#clavier button").forEach((b) => { b.onclick = () => toucher(b.dataset.touche); });
 document.addEventListener("keydown", (e) => {
   if (e.target.tagName === "INPUT") return;
-  if (/^[0-9*#]$/.test(e.key) && !$("vue-appel").classList.contains("cache")) toucher(e.key);
+  if (/^[0-9*#]$/.test(e.key)) toucher(e.key);
+  if (e.key === "Enter") actionVerte();
+  if (e.key === "Backspace" || e.key === "Escape") actionRouge();
 });
 $("son").onclick = () => {
   etat.son = !etat.son;
@@ -432,4 +505,5 @@ $("son").onclick = () => {
 if (!micPossible()) {
   $("info-voix").insertAdjacentHTML("afterend", '<p class="petit">⚠ Micro indisponible ici : utilisez http://localhost:8000/simulateur/ ou https.</p>');
 }
+afficherNumero();
 montrer("vue-bip");
